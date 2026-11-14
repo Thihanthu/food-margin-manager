@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({
 });
 
 const today = () => new Date().toISOString().slice(0, 10);
-const TABS = ["အနှစ်ချုပ်", "ပစ္စည်းဈေးနှုန်း", "ဝန်ထမ်းစရိတ်", "ကုန်ကြမ်းစရိတ်", "ဆိုင်ခွန်", "နေ့စဉ်ကုန်ကျငွေ"];
+const TABS = ["အနှစ်ချုပ်", "ပစ္စည်းဈေးနှုန်း", "ဝန်ထမ်းစရိတ်", "ကုန်ကြမ်းစရိတ်", "ဆိုင်ခွန်", "နေ့စဉ်ကုန်ကျငွေ", "နေ့စဉ်အရောင်း", "ပစ္စည်းလက်ကျန်", "ကုန်သည်စာရင်း", "ဖောက်သည်စာရင်း", "လစဉ်/နှစ်စဉ်ချုပ်"];
 
 function Index() {
   const [tab, setTab] = useState(0);
@@ -34,6 +34,27 @@ function Index() {
   const [daily, setDaily] = useTable("daily", [
     { id: uid(), date: today(), item: "ဓာတ်ဆီ", amount: 15000 },
   ]);
+
+  const [sales, setSales] = useTable("sales", [{ id: uid(), date: today(), product: "မုန့်ဟင်းခါး", qty: 20, price: 2500 }]);
+  const [stock, setStock] = useTable("stock", [{ id: uid(), name: "ဆန်", unit: "အိတ်", qty: 1, min: 2, supplier: "ဦးဘ" }]);
+  const [suppliers, setSuppliers] = useTable("suppliers", [{ id: uid(), name: "ဦးဘ", phone: "09xxxxxxx", goods: "ဆန်", owed: 0 }]);
+  const [customers, setCustomers] = useTable("customers", [{ id: uid(), name: "မစန္ဒာ", phone: "09xxxxxxx", note: "ပုံမှန်ဖောက်သည်", owed: 0 }]);
+  const costOf = (name: unknown) => num(products.find((p) => p["name"] === name)?.["cost"]);
+  const saleT = (r: Row) => num(r["qty"]) * num(r["price"]);
+  const saleP = (r: Row) => num(r["qty"]) * (num(r["price"]) - costOf(r["product"]));
+  const salesT = sum(sales, saleT);
+  const todaySales = sum(sales.filter((r) => r["date"] === today()), saleT);
+  const lowStock = stock.filter((r) => num(r["qty"]) <= num(r["min"]));
+  const fixedM = sum(staff, (r) => num(r["salary"])) + sum(taxes, (r) => num(r["amount"]));
+  const months = Array.from(new Set([...sales, ...daily].map((r) => String(r["date"] ?? "").slice(0, 7)).filter(Boolean))).sort().reverse();
+  const mRow = (m: string) => {
+    const rev = sum(sales.filter((r) => String(r["date"]).startsWith(m)), saleT);
+    const gp = sum(sales.filter((r) => String(r["date"]).startsWith(m)), saleP);
+    const exp = sum(daily.filter((r) => String(r["date"]).startsWith(m)), (r) => num(r["amount"]));
+    return { rev, gp, exp, net: gp - exp - fixedM };
+  };
+  const years = Array.from(new Set(months.map((m) => m.slice(0, 4))));
+  const yRow = (y: string) => months.filter((m) => m.startsWith(y)).map(mRow).reduce((a, b) => ({ rev: a.rev + b.rev, gp: a.gp + b.gp, exp: a.exp + b.exp, net: a.net + b.net }), { rev: 0, gp: 0, exp: 0, net: 0 });
 
   const staffT = sum(staff, (r) => num(r["salary"]));
   const matT = sum(materials, (r) => num(r["qty"]) * num(r["price"]));
@@ -70,6 +91,8 @@ function Index() {
               ["ဆိုင်ခွန်", taxT],
               ["နေ့စဉ်ကုန်ကျငွေ (စုစုပေါင်း)", dailyT],
               ["ယနေ့ ကုန်ကျငွေ", todayT],
+              ["ယနေ့ ရောင်းရငွေ", todaySales],
+              ["စုစုပေါင်း ရောင်းရငွေ", salesT],
             ].map(([l, v]) => (
               <div key={l as string} className="rounded-lg border bg-card p-5">
                 <p className="text-sm text-muted-foreground">{l}</p>
@@ -80,6 +103,12 @@ function Index() {
               <p className="text-sm">စုစုပေါင်း ကုန်ကျစရိတ်</p>
               <p className="mt-1 text-2xl font-bold">{ks(total)}</p>
             </div>
+            {lowStock.length > 0 && (
+              <div className="rounded-lg border border-destructive bg-card p-5 sm:col-span-2 lg:col-span-3">
+                <p className="font-semibold text-destructive">⚠ ပြန်ဝယ်ရန် လိုသောပစ္စည်းများ</p>
+                <p className="mt-1 text-sm">{lowStock.map((r) => `${r["name"]} (လက်ကျန် ${r["qty"]} ${r["unit"]})`).join("၊ ")}</p>
+              </div>
+            )}
           </div>
         )}
         {tab === 1 && <EditableTable rows={products} setRows={setProducts} blank={{ name: "", price: 0, cost: 0 }}
@@ -94,6 +123,39 @@ function Index() {
           cols={[{ key: "name", label: "ခွန်အမျိုးအစား" }, { key: "amount", label: "ပမာဏ", type: "number" }, { key: "note", label: "မှတ်ချက်" }]} />}
         {tab === 5 && <EditableTable rows={daily} setRows={setDaily} blank={{ date: today(), item: "", amount: 0 }}
           cols={[{ key: "date", label: "ရက်စွဲ", type: "date" }, { key: "item", label: "အကြောင်းအရာ" }, { key: "amount", label: "ပမာဏ", type: "number" }]} />}
+        {tab === 6 && <EditableTable rows={sales} setRows={setSales} blank={{ date: today(), product: "", qty: 1, price: 0 }}
+          cols={[{ key: "date", label: "ရက်စွဲ", type: "date" }, { key: "product", label: "ပစ္စည်းအမည်" }, { key: "qty", label: "အရေအတွက်", type: "number" },
+            { key: "price", label: "ရောင်းဈေး", type: "number" }, { key: "t", label: "ရောင်းရငွေ", calc: (r) => ks(saleT(r)) }, { key: "p", label: "အမြတ်", calc: (r) => ks(saleP(r)) }]} />}
+        {tab === 7 && <EditableTable rows={stock} setRows={setStock} blank={{ name: "", unit: "", qty: 0, min: 0, supplier: "" }}
+          cols={[{ key: "name", label: "ပစ္စည်း" }, { key: "unit", label: "ယူနစ်" }, { key: "qty", label: "လက်ကျန်", type: "number" },
+            { key: "min", label: "အနည်းဆုံးထားရမည်", type: "number" }, { key: "supplier", label: "ကုန်သည်" },
+            { key: "s", label: "အခြေအနေ", calc: (r) => (num(r["qty"]) <= num(r["min"]) ? "⚠ ပြန်ဝယ်ရန်" : "✓ လုံလောက်") }]} />}
+        {tab === 8 && <EditableTable rows={suppliers} setRows={setSuppliers} blank={{ name: "", phone: "", goods: "", owed: 0 }}
+          cols={[{ key: "name", label: "ကုန်သည်အမည်" }, { key: "phone", label: "ဖုန်း" }, { key: "goods", label: "ပေးသွင်းသောပစ္စည်း" }, { key: "owed", label: "ပေးရန်ကျန်ငွေ", type: "number" }]} />}
+        {tab === 9 && <EditableTable rows={customers} setRows={setCustomers} blank={{ name: "", phone: "", note: "", owed: 0 }}
+          cols={[{ key: "name", label: "ဖောက်သည်အမည်" }, { key: "phone", label: "ဖုန်း" }, { key: "note", label: "မှတ်ချက်" }, { key: "owed", label: "ရရန်ကျန်ငွေ", type: "number" }]} />}
+        {tab === 10 && (
+          <div className="space-y-6">
+            <p className="text-sm text-muted-foreground">အသားတင် = အရောင်းအမြတ် − နေ့စဉ်ကုန်ကျငွေ − လစဉ်ပုံသေစရိတ် (ဝန်ထမ်း + ခွန်: {ks(fixedM)})</p>
+            {([["လစဉ် စာရင်းချုပ်", months, mRow], ["နှစ်စဉ် စာရင်းချုပ်", years, yRow]] as const).map(([title, keys, fn]) => (
+              <div key={title}>
+                <h2 className="mb-2 text-lg font-bold">{title}</h2>
+                <div className="overflow-x-auto rounded-lg border bg-card">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted text-muted-foreground"><tr>
+                      {["ကာလ", "ရောင်းရငွေ", "အရောင်းအမြတ်", "နေ့စဉ်ကုန်ကျငွေ", "အသားတင်"].map((h) => <th key={h} className="px-3 py-2 text-left">{h}</th>)}
+                    </tr></thead>
+                    <tbody>{keys.map((k) => { const r = fn(k); return (
+                      <tr key={k} className="border-t">
+                        <td className="px-3 py-2 font-medium">{k}</td><td className="px-3 py-2">{ks(r.rev)}</td><td className="px-3 py-2">{ks(r.gp)}</td>
+                        <td className="px-3 py-2">{ks(r.exp)}</td><td className={`px-3 py-2 font-bold ${r.net < 0 ? "text-destructive" : "text-primary"}`}>{ks(r.net)}</td>
+                      </tr>); })}</tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
