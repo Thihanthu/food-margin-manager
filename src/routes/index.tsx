@@ -35,14 +35,14 @@ function Index() {
     { id: uid(), date: today(), item: "ဓာတ်ဆီ", amount: 15000 },
   ]);
 
-  const staffT = sum(staff, (r) => num(r.salary));
-  const matT = sum(materials, (r) => num(r.qty) * num(r.price));
-  const taxT = sum(taxes, (r) => num(r.amount));
-  const dailyT = sum(daily, (r) => num(r.amount));
-  const todayT = sum(daily.filter((r) => r.date === today()), (r) => num(r.amount));
+  const staffT = sum(staff, (r) => num(r["salary"]));
+  const matT = sum(materials, (r) => num(r["qty"]) * num(r["price"]));
+  const taxT = sum(taxes, (r) => num(r["amount"]));
+  const dailyT = sum(daily, (r) => num(r["amount"]));
+  const todayT = sum(daily.filter((r) => r["date"] === today()), (r) => num(r["amount"]));
   const total = staffT + matT + taxT + dailyT;
 
-  const margin = (r: Row) => ks(num(r.price) - num(r.cost));
+  const margin = (r: Row) => ks(num(r["price"]) - num(r["cost"]));
 
   return (
     <div className="min-h-screen">
@@ -89,7 +89,7 @@ function Index() {
           cols={[{ key: "name", label: "အမည်" }, { key: "role", label: "တာဝန်" }, { key: "salary", label: "လစာ", type: "number" }]} />}
         {tab === 3 && <EditableTable rows={materials} setRows={setMaterials} blank={{ name: "", unit: "", qty: 1, price: 0 }}
           cols={[{ key: "name", label: "ကုန်ကြမ်း" }, { key: "unit", label: "ယူနစ်" }, { key: "qty", label: "အရေအတွက်", type: "number" },
-            { key: "price", label: "တစ်ခုဈေး", type: "number" }, { key: "t", label: "စုစုပေါင်း", calc: (r) => ks(num(r.qty) * num(r.price)) }]} />}
+            { key: "price", label: "တစ်ခုဈေး", type: "number" }, { key: "t", label: "စုစုပေါင်း", calc: (r) => ks(num(r["qty"]) * num(r["price"])) }]} />}
         {tab === 4 && <EditableTable rows={taxes} setRows={setTaxes} blank={{ name: "", amount: 0, note: "" }}
           cols={[{ key: "name", label: "ခွန်အမျိုးအစား" }, { key: "amount", label: "ပမာဏ", type: "number" }, { key: "note", label: "မှတ်ချက်" }]} />}
         {tab === 5 && <EditableTable rows={daily} setRows={setDaily} blank={{ date: today(), item: "", amount: 0 }}
