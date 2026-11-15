@@ -1,10 +1,11 @@
 import { Plus, Trash2 } from "lucide-react";
 import { uid, type Row } from "@/lib/store";
+import { Button } from "@/components/ui/button";
 
 export type Col = { key: string; label: string; type?: "text" | "number" | "date"; calc?: (r: Row) => string };
 
-export function EditableTable({ cols, rows, setRows, blank }: {
-  cols: Col[]; rows: Row[]; setRows: (r: Row[]) => void; blank: Omit<Row, "id">;
+export function EditableTable({ cols, rows, setRows, blank, readOnly = false }: {
+  cols: Col[]; rows: Row[]; setRows: (r: Row[]) => void; blank: Omit<Row, "id">; readOnly?: boolean;
 }) {
   const update = (id: string, k: string, v: string, t?: string) =>
     setRows(rows.map((r) => (r.id === id ? { ...r, [k]: t === "number" ? Number(v) : v } : r)));
@@ -14,7 +15,7 @@ export function EditableTable({ cols, rows, setRows, blank }: {
         <thead className="bg-muted text-muted-foreground">
           <tr>
             {cols.map((c) => <th key={c.key} className="px-3 py-2 text-left font-semibold">{c.label}</th>)}
-            <th className="w-10" />
+            {!readOnly && <th className="w-10" />}
           </tr>
         </thead>
         <tbody>
@@ -24,7 +25,7 @@ export function EditableTable({ cols, rows, setRows, blank }: {
                 <td key={c.key} className="px-1 py-1">
                   {c.calc ? (
                     <span className="px-2 font-semibold text-primary">{c.calc(r)}</span>
-                  ) : (
+                  ) : readOnly ? <span className="block px-2 py-1.5">{r[c.key]}</span> : (
                     <input
                       type={c.type ?? "text"}
                       value={r[c.key] ?? ""}
@@ -34,18 +35,18 @@ export function EditableTable({ cols, rows, setRows, blank }: {
                   )}
                 </td>
               ))}
-              <td>
-                <button aria-label="ဖျက်ရန်" onClick={() => setRows(rows.filter((x) => x.id !== r.id))}
-                  className="p-2 text-muted-foreground hover:text-destructive"><Trash2 size={16} /></button>
-              </td>
+              {!readOnly && <td>
+                <Button variant="ghost" size="icon" aria-label="ဖျက်ရန်" onClick={() => setRows(rows.filter((x) => x.id !== r.id))}
+                  className="text-muted-foreground hover:text-destructive"><Trash2 size={16} /></Button>
+              </td>}
             </tr>
           ))}
         </tbody>
       </table>
-      <button onClick={() => setRows([...rows, { id: uid(), ...blank }])}
+      {!readOnly && <Button variant="ghost" onClick={() => setRows([...rows, { id: uid(), ...blank }])}
         className="flex w-full items-center justify-center gap-2 border-t py-2.5 text-sm font-medium text-primary hover:bg-accent">
         <Plus size={16} /> အသစ်ထည့်ရန်
-      </button>
+      </Button>}
     </div>
   );
 }

@@ -8,8 +8,18 @@
 // hosting already compresses at the edge.
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  vite: { plugins: [VitePWA({
+    strategies: 'generateSW', filename: 'sw.js', injectRegister: null,
+    registerType: 'autoUpdate', devOptions: { enabled: false },
+    manifest: { name: 'စားသောက်ဆိုင် စာရင်းစနစ်', short_name: 'ဆိုင်စာရင်း', display: 'standalone', start_url: '/', scope: '/', icons: [{ src: '/icons/app-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icons/app-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }] },
+    workbox: { globPatterns: ['**/*.{js,css,png,ico,webmanifest,woff2}'], navigateFallback: null, runtimeCaching: [
+      { urlPattern: ({ request, url }) => request.mode === 'navigate' && url.origin === self.location.origin && !url.pathname.startsWith('/~oauth'), handler: 'NetworkFirst', options: { cacheName: 'ledger-pages', networkTimeoutSeconds: 4 } },
+      { urlPattern: ({ url }) => url.origin === self.location.origin && /\/assets\/.+-[\w-]+\.(js|css|woff2)$/.test(url.pathname), handler: 'CacheFirst', options: { cacheName: 'ledger-assets' } }
+    ] }
+  })] },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

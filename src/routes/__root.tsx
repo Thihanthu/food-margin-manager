@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { registerOfflineApp } from "../lib/pwa-registration";
 
 function NotFoundComponent() {
   return (
@@ -97,6 +98,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icons/app-192.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -121,6 +124,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEffect(() => { void registerOfflineApp().catch(console.error); }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

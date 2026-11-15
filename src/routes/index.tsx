@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { EditableTable, type Col } from "@/components/EditableTable";
 import { useTable, num, sum, ks, uid, type Row } from "@/lib/store";
+import { OfflineApp } from "@/components/OfflineApp";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -14,8 +16,10 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: Index,
+  component: OfflineHome,
 });
+
+function OfflineHome() { return <OfflineApp><Index /></OfflineApp>; }
 
 const today = () => new Date().toISOString().slice(0, 10);
 const TABS = ["အနှစ်ချုပ်", "ပစ္စည်းဈေးနှုန်း", "ဝန်ထမ်းစရိတ်", "ကုန်ကြမ်းစရိတ်", "ဆိုင်ခွန်", "နေ့စဉ်ကုန်ကျငွေ", "နေ့စဉ်အရောင်း", "ပစ္စည်းလက်ကျန်", "ကုန်သည်စာရင်း", "ဖောက်သည်စာရင်း", "လစဉ်/နှစ်စဉ်ချုပ်"];
@@ -70,14 +74,13 @@ function Index() {
       <header className="bg-primary text-primary-foreground">
         <div className="mx-auto max-w-5xl px-4 py-6">
           <h1 className="text-2xl font-bold">စားသောက်ဆိုင် စာရင်းစနစ်</h1>
-          <p className="text-sm opacity-80">နှိပ်ပြီး တိုက်ရိုက်ပြင်နိုင်ပါသည် — အလိုအလျောက် သိမ်းဆည်းပါသည်</p>
         </div>
         <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-4">
           {TABS.map((t, i) => (
-            <button key={t} onClick={() => setTab(i)}
+            <Button variant="ghost" key={t} onClick={() => setTab(i)}
               className={`whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-medium ${tab === i ? "bg-background text-foreground" : "opacity-80 hover:opacity-100"}`}>
               {t}
-            </button>
+            </Button>
           ))}
         </nav>
       </header>
