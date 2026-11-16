@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { LogOut, ShieldCheck, Users, Download, Upload, LockKeyhole } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ACCESS_KEY, TABLE_KEYS, makeProfile, passwordHash, parseBackup, staffProjection, type AccessData, type Profile } from '@/lib/offline-access';
+import { ACCESS_KEY, SESSION_KEY, TABLE_KEYS, makeProfile, passwordHash, parseBackup, restoreSession, staffProjection, type AccessData, type Profile } from '@/lib/offline-access';
 import { EditableTable } from '@/components/EditableTable';
 import { type Row } from '@/lib/store';
 
@@ -16,22 +16,39 @@ export function OfflineApp({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [manage, setManage] = useState(false);
   useEffect(() => {
-    try { const raw = localStorage.getItem(ACCESS_KEY); if (raw) setAccess(JSON.parse(raw)); }
-    catch { setError('အကောင့်ဒေတာ ဖတ်မရပါ။'); }
+    function loadAccess() {
+      try {
+        const raw = localStorage.getItem(ACCESS_KEY);
+        const data: AccessData | null = raw ? JSON.parse(raw) : null;
+        const restored = restoreSession(data, localStorage.getItem(SESSION_KEY));
+        setAccess(data); setSession(restored);
+        if (!restored) localStorage.removeItem(SESSION_KEY);
+      } catch { setSession(null); setError('အကောင့်ဒေတာ ဖတ်မရပါ။'); }
+    }
+    loadAccess();
     setReady(true);
+    function sync(event: StorageEvent) {
+      if (event.key === ACCESS_KEY || event.key === SESSION_KEY || event.key === null) {
+        loadAccess(); setManage(false);
+      }
+    }
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
   }, []);
   const saveAccess = (data: AccessData) => { localStorage.setItem(ACCESS_KEY, JSON.stringify(data)); setAccess(data); };
+  const signIn = (profile: Profile) => { localStorage.setItem(SESSION_KEY, profile.id); setSession(profile); };
   async function submit() {
     setBusy(true); setError('');
     try {
       if (!access) {
         if (!name.trim() || !username.trim() || password.length < 8) throw new Error('အမည်၊ အကောင့်အမည်နှင့် အနည်းဆုံး ၈ လုံးပါ စကားဝှက် ဖြည့်ပါ။');
         const profile = await makeProfile(username, name, password);
-        saveAccess({ profiles: [profile], roles: { [profile.id]: 'admin' } }); setSession(profile);
+        saveAccess({ profiles: [profile], roles: { [profile.id]: 'admin' } }); signIn(profile);
       } else {
         const profile = access.profiles.find(p => p.username === username.trim().toLowerCase());
         if (!profile || await passwordHash(password, profile.salt) !== profile.hash) throw new Error('အကောင့်အမည် သို့မဟုတ် စကားဝှက် မှားနေပါသည်။');
-        setSession(profile);
+        if (!restoreSession(access, profile.id)) throw new Error('ဤအကောင့်ကို အသုံးပြုခွင့် မရှိပါ။');
+        signIn(profile);
       }
       setPassword(''); setUsername(''); setName('');
     } catch (e) { setError(e instanceof Error ? e.message : 'သိမ်းမရပါ။'); } finally { setBusy(false); }
@@ -53,7 +70,7 @@ export function OfflineApp({ children }: { children: ReactNode }) {
     <div className="border-b bg-card"><div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
       <ShieldCheck className="text-primary" /><span className="flex-1 font-semibold">{session.name} · {admin ? 'Admin' : 'User'}</span>
       {admin && <Button variant="outline" onClick={() => setManage(!manage)}><Users />အကောင့် / Backup</Button>}
-      <Button variant="ghost" onClick={() => { setSession(null); setManage(false); setError(''); }}><LogOut />ထွက်ရန်</Button>
+      <Button variant="ghost" onClick={() => { localStorage.removeItem(SESSION_KEY); setSession(null); setManage(false); setError(''); }}><LogOut />ထွက်ရန်</Button>
     </div></div>
     {admin && manage && access ? <AdminTools access={access} save={saveAccess} /> : admin ? children : <StaffPanel profile={session} />}
   </>;

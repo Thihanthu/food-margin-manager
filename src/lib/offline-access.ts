@@ -1,6 +1,11 @@
 export type Profile = { id: string; username: string; name: string; salt: string; hash: string };
 export type AccessData = { profiles: Profile[]; roles: Record<string, 'admin' | 'user'> };
 export const ACCESS_KEY = 'biz:access';
+export const SESSION_KEY = 'biz:session';
+export function restoreSession(access: AccessData | null, profileId: string | null): Profile | null {
+  if (!access || !profileId || !['admin', 'user'].includes(access.roles[profileId] ?? '')) return null;
+  return access.profiles.find(profile => profile.id === profileId) ?? null;
+}
 export const TABLE_KEYS = ['products', 'staff', 'materials', 'taxes', 'daily', 'sales', 'stock', 'suppliers', 'customers'] as const;
 export const STAFF_FIELDS: Record<string, string[]> = { products: ['id', 'name', 'price'], stock: ['id', 'name', 'unit', 'qty', 'min'] };
 export function staffProjection(key: string, rows: Record<string, string | number>[]) {

@@ -7,7 +7,7 @@ const empty = { name: '', phone: '', address: '', lastPurchase: '', purchaseHist
 
 export function CustomerPanel({ rows, setRows }: { rows: Row[]; setRows: (rows: Row[]) => void }) {
   const [search, setSearch] = useState('');
-  const [draft, setDraft] = useState<Row | null>(null);
+  const [draft, setDraft] = useState<Row | null>(() => rows.length === 0 ? { id: uid(), ...empty } : null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const filtered = rows.filter(row => [row['name'], row['phone'], row['address']].some(value => String(value ?? '').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())));
@@ -34,7 +34,7 @@ export function CustomerPanel({ rows, setRows }: { rows: Row[]; setRows: (rows: 
       <div className="flex items-center justify-between gap-3"><h3 className="font-semibold">{rows.some(row => row.id === draft.id) ? 'ဖောက်သည်အချက်အလက် ပြင်ရန်' : 'ဖောက်သည်အသစ်'}</h3><Button type="button" variant="ghost" size="icon" aria-label="ပိတ်ရန်" title="ပိတ်ရန်" onClick={() => setDraft(null)}><X /></Button></div>
       <div className="grid gap-4 sm:grid-cols-2">
         {([
-          ['name', 'ဖောက်သည်အမည်', 'text'], ['phone', 'ဖုန်း', 'tel'], ['address', 'လိပ်စာ', 'text'],
+          ['name', 'ဖောက်သည်အမည်', 'text'], ['phone', 'ဖုန်းနံပါတ်', 'tel'], ['address', 'လိပ်စာ', 'text'],
           ['lastPurchase', 'နောက်ဆုံးဝယ်ယူရက်', 'date'], ['owed', 'ရရန်ကျန်ငွေ (ကျပ်)', 'number'],
         ] as const).map(([key, label, type]) => <label key={key} className="space-y-2 text-sm font-medium"><span className="block">{label}</span><input required={key === 'name'} type={type} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 'any' : undefined} value={draft[key] ?? ''} onChange={e => setDraft({ ...draft, [key]: e.target.value })} className="w-full min-w-0 rounded-md border bg-background px-3 py-2" /></label>)}
         {([['purchaseHistory', 'ဝယ်ယူမှုမှတ်တမ်း'], ['note', 'မှတ်ချက်']] as const).map(([key, label]) => <label key={key} className="space-y-2 text-sm font-medium"><span className="block">{label}</span><textarea rows={3} value={draft[key] ?? ''} onChange={e => setDraft({ ...draft, [key]: e.target.value })} className="w-full rounded-md border bg-background px-3 py-2" /></label>)}

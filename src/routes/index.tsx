@@ -76,7 +76,7 @@ function Index() {
         <div className="mx-auto max-w-5xl px-4 py-6">
           <h1 className="text-2xl font-bold">စားသောက်ဆိုင် စာရင်းစနစ်</h1>
         </div>
-        <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-4">
+        <nav aria-label="စာရင်းအမျိုးအစားများ" className="mx-auto flex max-w-5xl flex-wrap gap-1 px-4 pb-2">
           {TABS.map((t, i) => (
             <Button variant="ghost" key={t} onClick={() => setTab(i)}
               className={`whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-medium ${tab === i ? "bg-background text-foreground" : "opacity-80 hover:opacity-100"}`}>
