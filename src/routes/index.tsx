@@ -4,6 +4,7 @@ import { EditableTable, type Col } from "@/components/EditableTable";
 import { useTable, num, sum, ks, uid, type Row } from "@/lib/store";
 import { OfflineApp } from "@/components/OfflineApp";
 import { Button } from "@/components/ui/button";
+import { CustomerPanel } from "@/components/CustomerPanel";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -42,7 +43,7 @@ function Index() {
   const [sales, setSales] = useTable("sales", [{ id: uid(), date: today(), product: "မုန့်ဟင်းခါး", qty: 20, price: 2500 }]);
   const [stock, setStock] = useTable("stock", [{ id: uid(), name: "ဆန်", unit: "အိတ်", qty: 1, min: 2, supplier: "ဦးဘ" }]);
   const [suppliers, setSuppliers] = useTable("suppliers", [{ id: uid(), name: "ဦးဘ", phone: "09xxxxxxx", goods: "ဆန်", owed: 0 }]);
-  const [customers, setCustomers] = useTable("customers", [{ id: uid(), name: "မစန္ဒာ", phone: "09xxxxxxx", note: "ပုံမှန်ဖောက်သည်", owed: 0 }]);
+  const [customers, setCustomers] = useTable("customers", []);
   const costOf = (name: unknown) => num(products.find((p) => p["name"] === name)?.["cost"]);
   const saleT = (r: Row) => num(r["qty"]) * num(r["price"]);
   const saleP = (r: Row) => num(r["qty"]) * (num(r["price"]) - costOf(r["product"]));
@@ -135,8 +136,7 @@ function Index() {
             { key: "s", label: "အခြေအနေ", calc: (r) => (num(r["qty"]) <= num(r["min"]) ? "⚠ ပြန်ဝယ်ရန်" : "✓ လုံလောက်") }]} />}
         {tab === 8 && <EditableTable rows={suppliers} setRows={setSuppliers} blank={{ name: "", phone: "", goods: "", owed: 0 }}
           cols={[{ key: "name", label: "ကုန်သည်အမည်" }, { key: "phone", label: "ဖုန်း" }, { key: "goods", label: "ပေးသွင်းသောပစ္စည်း" }, { key: "owed", label: "ပေးရန်ကျန်ငွေ", type: "number" }]} />}
-        {tab === 9 && <EditableTable rows={customers} setRows={setCustomers} blank={{ name: "", phone: "", note: "", owed: 0 }}
-          cols={[{ key: "name", label: "ဖောက်သည်အမည်" }, { key: "phone", label: "ဖုန်း" }, { key: "note", label: "မှတ်ချက်" }, { key: "owed", label: "ရရန်ကျန်ငွေ", type: "number" }]} />}
+        {tab === 9 && <CustomerPanel rows={customers} setRows={setCustomers} />}
         {tab === 10 && (
           <div className="space-y-6">
             <p className="text-sm text-muted-foreground">အသားတင် = အရောင်းအမြတ် − နေ့စဉ်ကုန်ကျငွေ − လစဉ်ပုံသေစရိတ် (ဝန်ထမ်း + ခွန်: {ks(fixedM)})</p>

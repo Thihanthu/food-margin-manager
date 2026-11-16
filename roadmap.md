@@ -1,4 +1,5 @@
 # Tasks
+- [x] Complete customer contact details and purchase notes with add, edit, search and delete; verify local persistence and mobile layout.
 - [x] Add offline admin/staff screen access and local profiles; hide profit, totals, purchases and supplier contacts from staff.
 - [x] Add administrator backup export and validated restore.
 - [x] Add installable offline support, disabled in editor previews.
