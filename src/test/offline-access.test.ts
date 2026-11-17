@@ -19,6 +19,11 @@ describe('Offline session', () => {
   it('does not restore an account with revoked access', () => { expect(restoreSession({ profiles: [owner, staff], roles: { owner: 'admin' } }, 'staff')).toBeNull(); });
 });
 describe('Backup', () => {
+  it('preserves customer names on sales and accepts older unnamed sales', () => {
+    const tables: Record<string, Record<string, string | number>[]> = Object.fromEntries(TABLE_KEYS.map(k => [k, []]));
+    tables['sales'] = [{ id: 'sale-1', customer: 'မမေ', product: 'Tea', qty: 1, price: 1000 }, { id: 'sale-2', product: 'Tea', qty: 2, price: 1000 }];
+    expect(parseBackup(JSON.stringify({ app: 'food-margin-manager', version: 1, tables }))['sales']).toEqual(tables['sales']);
+  });
   it('accepts complete valid table backup', () => { const tables = Object.fromEntries(TABLE_KEYS.map(k => [k,[{id:'1',qty:2}]])); expect(parseBackup(JSON.stringify({app:'food-margin-manager',version:1,tables}))).toEqual(tables); });
   it('rejects malformed tables before restore', () => { expect(() => parseBackup(JSON.stringify({app:'food-margin-manager',version:1,tables:{products:[{qty:2}]}}))).toThrow(); });
 });

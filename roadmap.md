@@ -1,6 +1,8 @@
 # Tasks
+- [x] Add customer names to owner and staff sale entry; verify offline persistence.
+- [ ] Add combined-item calculation; waiting for clarification on multi-item sales versus ingredient costing.
 - [ ] Preserve offline owner/staff login until explicit logout; verify reload, reopen and account removal.
-- [ ] Make customer navigation and empty customer entry fields visible; verify saved details after reopening.
+- [x] Make customer navigation and empty customer entry fields visible; verify saved details after reopening.
 - [x] Complete customer contact details and purchase notes with add, edit, search and delete; verify local persistence and mobile layout.
 - [x] Add offline admin/staff screen access and local profiles; hide profit, totals, purchases and supplier contacts from staff.
 - [x] Add administrator backup export and validated restore.

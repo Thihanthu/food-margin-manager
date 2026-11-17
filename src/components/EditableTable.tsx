@@ -2,7 +2,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { uid, type Row } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 
-export type Col = { key: string; label: string; type?: "text" | "number" | "date"; calc?: (r: Row) => string };
+export type Col = { key: string; label: string; type?: "text" | "number" | "date"; options?: string[]; calc?: (r: Row) => string };
 
 export function EditableTable({ cols, rows, setRows, blank, readOnly = false }: {
   cols: Col[]; rows: Row[]; setRows: (r: Row[]) => void; blank: Omit<Row, "id">; readOnly?: boolean;
@@ -26,12 +26,17 @@ export function EditableTable({ cols, rows, setRows, blank, readOnly = false }: 
                   {c.calc ? (
                     <span className="px-2 font-semibold text-primary">{c.calc(r)}</span>
                   ) : readOnly ? <span className="block px-2 py-1.5">{r[c.key]}</span> : (
+                    <>
                     <input
                       type={c.type ?? "text"}
+                      aria-label={c.label}
+                      list={c.options ? `${r.id}-${c.key}-options` : undefined}
                       value={r[c.key] ?? ""}
                       onChange={(e) => update(r.id, c.key, e.target.value, c.type)}
                       className="w-full min-w-24 rounded-md bg-transparent px-2 py-1.5 outline-none focus:bg-background focus:ring-2 focus:ring-ring"
                     />
+                    {c.options && <datalist id={`${r.id}-${c.key}-options`}>{c.options.map(option => <option key={option} value={option} />)}</datalist>}
+                    </>
                   )}
                 </td>
               ))}

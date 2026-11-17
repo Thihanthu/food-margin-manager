@@ -127,8 +127,8 @@ function Index() {
           cols={[{ key: "name", label: "ခွန်အမျိုးအစား" }, { key: "amount", label: "ပမာဏ", type: "number" }, { key: "note", label: "မှတ်ချက်" }]} />}
         {tab === 5 && <EditableTable rows={daily} setRows={setDaily} blank={{ date: today(), item: "", amount: 0 }}
           cols={[{ key: "date", label: "ရက်စွဲ", type: "date" }, { key: "item", label: "အကြောင်းအရာ" }, { key: "amount", label: "ပမာဏ", type: "number" }]} />}
-        {tab === 6 && <EditableTable rows={sales} setRows={setSales} blank={{ date: today(), product: "", qty: 1, price: 0 }}
-          cols={[{ key: "date", label: "ရက်စွဲ", type: "date" }, { key: "product", label: "ပစ္စည်းအမည်" }, { key: "qty", label: "အရေအတွက်", type: "number" },
+        {tab === 6 && <EditableTable rows={sales} setRows={setSales} blank={{ date: today(), customer: "", product: "", qty: 1, price: 0 }}
+          cols={[{ key: "date", label: "ရက်စွဲ", type: "date" }, { key: "customer", label: "ဖောက်သည်အမည်", options: Array.from(new Set(customers.map(row => String(row['name'] ?? '')).filter(Boolean))) }, { key: "product", label: "ပစ္စည်းအမည်" }, { key: "qty", label: "အရေအတွက်", type: "number" },
             { key: "price", label: "ရောင်းဈေး", type: "number" }, { key: "t", label: "ရောင်းရငွေ", calc: (r) => ks(saleT(r)) }, { key: "p", label: "အမြတ်", calc: (r) => ks(saleP(r)) }]} />}
         {tab === 7 && <EditableTable rows={stock} setRows={setStock} blank={{ name: "", unit: "", qty: 0, min: 0, supplier: "" }}
           cols={[{ key: "name", label: "ပစ္စည်း" }, { key: "unit", label: "ယူနစ်" }, { key: "qty", label: "လက်ကျန်", type: "number" },
