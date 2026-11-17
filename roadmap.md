@@ -1,6 +1,6 @@
 # Tasks
 - [x] Add customer names to owner and staff sale entry; verify offline persistence.
-- [ ] Add combined-item calculation; waiting for clarification on multi-item sales versus ingredient costing.
+- [ ] Add per-serving ingredient recipes with fractional quantities, calculated cost, and stock deduction for owner/staff sales, including edits and deletions; verify backups and both screen sizes.
 - [x] Preserve offline owner/staff login until explicit logout; browser-verified reload and logout, with saved-session and account-removal tests passing.
 - [x] Make customer navigation and empty customer entry fields visible; verify saved details after reopening.
 - [x] Complete customer contact details and purchase notes with add, edit, search and delete; verify local persistence and mobile layout.
