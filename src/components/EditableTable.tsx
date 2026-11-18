@@ -29,6 +29,7 @@ export function EditableTable({ cols, rows, setRows, blank, readOnly = false }: 
                     <>
                     <input
                       type={c.type ?? "text"}
+                      step={c.type === 'number' ? 'any' : undefined}
                       aria-label={c.label}
                       list={c.options ? `${r.id}-${c.key}-options` : undefined}
                       value={r[c.key] ?? ""}

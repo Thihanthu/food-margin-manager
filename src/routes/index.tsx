@@ -5,6 +5,9 @@ import { useTable, num, sum, ks, uid, type Row } from "@/lib/store";
 import { OfflineApp } from "@/components/OfflineApp";
 import { Button } from "@/components/ui/button";
 import { CustomerPanel } from "@/components/CustomerPanel";
+import { RecipePanel } from "@/components/RecipePanel";
+import { SalesPanel } from "@/components/SalesPanel";
+import { recipeCost, saleProfit, saveSales } from "@/lib/recipes";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -23,7 +26,7 @@ export const Route = createFileRoute("/")({
 function OfflineHome() { return <OfflineApp><Index /></OfflineApp>; }
 
 const today = () => new Date().toISOString().slice(0, 10);
-const TABS = ["အနှစ်ချုပ်", "ပစ္စည်းဈေးနှုန်း", "ဝန်ထမ်းစရိတ်", "ကုန်ကြမ်းစရိတ်", "ဆိုင်ခွန်", "နေ့စဉ်ကုန်ကျငွေ", "နေ့စဉ်အရောင်း", "ပစ္စည်းလက်ကျန်", "ကုန်သည်စာရင်း", "ဖောက်သည်စာရင်း", "လစဉ်/နှစ်စဉ်ချုပ်"];
+const TABS = ["အနှစ်ချုပ်", "ပစ္စည်းဈေးနှုန်း", "ဝန်ထမ်းစရိတ်", "ကုန်ကြမ်းစရိတ်", "ဆိုင်ခွန်", "နေ့စဉ်ကုန်ကျငွေ", "နေ့စဉ်အရောင်း", "ပစ္စည်းလက်ကျန်", "ကုန်သည်စာရင်း", "ဖောက်သည်စာရင်း", "လစဉ်/နှစ်စဉ်ချုပ်", "ကုန်ကြမ်းသုံးနှုန်း"];
 
 function Index() {
   const [tab, setTab] = useState(0);
@@ -40,13 +43,13 @@ function Index() {
     { id: uid(), date: today(), item: "ဓာတ်ဆီ", amount: 15000 },
   ]);
 
-  const [sales, setSales] = useTable("sales", [{ id: uid(), date: today(), product: "မုန့်ဟင်းခါး", qty: 20, price: 2500 }]);
+  const [sales] = useTable("sales", [{ id: uid(), date: today(), product: "မုန့်ဟင်းခါး", qty: 20, price: 2500 }]);
   const [stock, setStock] = useTable("stock", [{ id: uid(), name: "ဆန်", unit: "အိတ်", qty: 1, min: 2, supplier: "ဦးဘ" }]);
   const [suppliers, setSuppliers] = useTable("suppliers", [{ id: uid(), name: "ဦးဘ", phone: "09xxxxxxx", goods: "ဆန်", owed: 0 }]);
   const [customers, setCustomers] = useTable("customers", []);
-  const costOf = (name: unknown) => num(products.find((p) => p["name"] === name)?.["cost"]);
   const saleT = (r: Row) => num(r["qty"]) * num(r["price"]);
-  const saleP = (r: Row) => num(r["qty"]) * (num(r["price"]) - costOf(r["product"]));
+  const cost = (r: Row) => { try { return recipeCost(r, stock); } catch { return num(r['cost']); } };
+  const saleP = (r: Row) => { try { return saleProfit(r, products, stock); } catch { return num(r['qty']) * (num(r['price']) - num(products.find(p => p['name'] === r['product'])?.['cost'])); } };
   const salesT = sum(sales, saleT);
   const todaySales = sum(sales.filter((r) => r["date"] === today()), saleT);
   const lowStock = stock.filter((r) => num(r["qty"]) <= num(r["min"]));
@@ -68,7 +71,7 @@ function Index() {
   const todayT = sum(daily.filter((r) => r["date"] === today()), (r) => num(r["amount"]));
   const total = staffT + matT + taxT + dailyT;
 
-  const margin = (r: Row) => ks(num(r["price"]) - num(r["cost"]));
+  const margin = (r: Row) => ks(num(r["price"]) - cost(r));
 
   return (
     <div className="min-h-screen">
@@ -117,7 +120,7 @@ function Index() {
         )}
         {tab === 1 && <EditableTable rows={products} setRows={setProducts} blank={{ name: "", price: 0, cost: 0 }}
           cols={[{ key: "name", label: "ပစ္စည်းအမည်" }, { key: "price", label: "ရောင်းဈေး", type: "number" },
-            { key: "cost", label: "အရင်း", type: "number" }, { key: "m", label: "အမြတ်", calc: margin }] as Col[]} />}
+             { key: "cost", label: "အရင်း (ကိုယ်တိုင်ဖြည့်)", type: "number" }, { key: "recipeCost", label: "တွက်ချက်ထားသောအရင်း", calc: r => { try { return ks(recipeCost(r, stock)); } catch { return 'ကုန်ကြမ်းဈေး စစ်ပါ'; } } }, { key: "m", label: "အမြတ်", calc: margin }] as Col[]} />}
         {tab === 2 && <EditableTable rows={staff} setRows={setStaff} blank={{ name: "", role: "", salary: 0 }}
           cols={[{ key: "name", label: "အမည်" }, { key: "role", label: "တာဝန်" }, { key: "salary", label: "လစာ", type: "number" }]} />}
         {tab === 3 && <EditableTable rows={materials} setRows={setMaterials} blank={{ name: "", unit: "", qty: 1, price: 0 }}
@@ -127,16 +130,16 @@ function Index() {
           cols={[{ key: "name", label: "ခွန်အမျိုးအစား" }, { key: "amount", label: "ပမာဏ", type: "number" }, { key: "note", label: "မှတ်ချက်" }]} />}
         {tab === 5 && <EditableTable rows={daily} setRows={setDaily} blank={{ date: today(), item: "", amount: 0 }}
           cols={[{ key: "date", label: "ရက်စွဲ", type: "date" }, { key: "item", label: "အကြောင်းအရာ" }, { key: "amount", label: "ပမာဏ", type: "number" }]} />}
-        {tab === 6 && <EditableTable rows={sales} setRows={setSales} blank={{ date: today(), customer: "", product: "", qty: 1, price: 0 }}
-          cols={[{ key: "date", label: "ရက်စွဲ", type: "date" }, { key: "customer", label: "ဖောက်သည်အမည်", options: Array.from(new Set(customers.map(row => String(row['name'] ?? '')).filter(Boolean))) }, { key: "product", label: "ပစ္စည်းအမည်" }, { key: "qty", label: "အရေအတွက်", type: "number" },
-            { key: "price", label: "ရောင်းဈေး", type: "number" }, { key: "t", label: "ရောင်းရငွေ", calc: (r) => ks(saleT(r)) }, { key: "p", label: "အမြတ်", calc: (r) => ks(saleP(r)) }]} />}
-        {tab === 7 && <EditableTable rows={stock} setRows={setStock} blank={{ name: "", unit: "", qty: 0, min: 0, supplier: "" }}
+        {tab === 6 && <SalesPanel rows={sales} products={products} customers={customers} save={saveSales} profit={saleP} />}
+        {tab === 7 && <EditableTable rows={stock} setRows={setStock} blank={{ name: "", unit: "", qty: 0, min: 0, supplier: "", unitCost: 0 }}
           cols={[{ key: "name", label: "ပစ္စည်း" }, { key: "unit", label: "ယူနစ်" }, { key: "qty", label: "လက်ကျန်", type: "number" },
+            { key: "unitCost", label: "တစ်ယူနစ်ဈေး", type: "number" },
             { key: "min", label: "အနည်းဆုံးထားရမည်", type: "number" }, { key: "supplier", label: "ကုန်သည်" },
             { key: "s", label: "အခြေအနေ", calc: (r) => (num(r["qty"]) <= num(r["min"]) ? "⚠ ပြန်ဝယ်ရန်" : "✓ လုံလောက်") }]} />}
         {tab === 8 && <EditableTable rows={suppliers} setRows={setSuppliers} blank={{ name: "", phone: "", goods: "", owed: 0 }}
           cols={[{ key: "name", label: "ကုန်သည်အမည်" }, { key: "phone", label: "ဖုန်း" }, { key: "goods", label: "ပေးသွင်းသောပစ္စည်း" }, { key: "owed", label: "ပေးရန်ကျန်ငွေ", type: "number" }]} />}
         {tab === 9 && <CustomerPanel rows={customers} setRows={setCustomers} />}
+        {tab === 11 && <RecipePanel products={products} stock={stock} setProducts={setProducts} />}
         {tab === 10 && (
           <div className="space-y-6">
             <p className="text-sm text-muted-foreground">အသားတင် = အရောင်းအမြတ် − နေ့စဉ်ကုန်ကျငွေ − လစဉ်ပုံသေစရိတ် (ဝန်ထမ်း + ခွန်: {ks(fixedM)})</p>

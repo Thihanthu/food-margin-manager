@@ -1,3 +1,4 @@
+import { parseIngredients } from './recipes';
 export type Profile = { id: string; username: string; name: string; salt: string; hash: string };
 export type AccessData = { profiles: Profile[]; roles: Record<string, 'admin' | 'user'> };
 export const ACCESS_KEY = 'biz:access';
@@ -27,6 +28,12 @@ export function parseBackup(text: string) {
   for (const key of TABLE_KEYS) {
     const rows = value.tables[key];
     if (!Array.isArray(rows) || rows.some((r: unknown) => !r || typeof r !== 'object' || typeof (r as { id?: unknown }).id !== 'string' || Object.values(r).some(v => !['string', 'number'].includes(typeof v)))) throw new Error('စာရင်းဒေတာ မမှန်ပါ');
+    if (rows.some((r: Record<string, unknown>) => Object.values(r).some(v => typeof v === 'number' && !Number.isFinite(v)))) throw new Error('စာရင်းဒေတာ မမှန်ပါ');
+    for (const row of rows) {
+      if (key === 'products' && row.recipe) parseIngredients(String(row.recipe));
+      if (key === 'sales' && row.usage) parseIngredients(String(row.usage));
+      if (key === 'stock' && row.unitCost !== undefined && (!Number.isFinite(Number(row.unitCost)) || Number(row.unitCost) < 0)) throw new Error('ကုန်ကြမ်းဈေး မမှန်ပါ');
+    }
   }
   return value.tables as Record<typeof TABLE_KEYS[number], Record<string, string | number>[]>;
 }

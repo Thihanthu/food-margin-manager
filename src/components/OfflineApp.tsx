@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ACCESS_KEY, SESSION_KEY, TABLE_KEYS, makeProfile, passwordHash, parseBackup, restoreSession, staffProjection, type AccessData, type Profile } from '@/lib/offline-access';
 import { EditableTable } from '@/components/EditableTable';
 import { type Row } from '@/lib/store';
+import { saveSales } from '@/lib/recipes';
 
 export function OfflineApp({ children }: { children: ReactNode }) {
   const [access, setAccess] = useState<AccessData | null>(null);
@@ -117,15 +118,19 @@ function AdminTools({ access, save }: { access: AccessData; save: (v: AccessData
 function StaffPanel({ profile }: { profile: Profile }) {
   const [customer, setCustomer] = useState('');
   const [tab, setTab] = useState('sales'); const [products, setProducts] = useState<Row[]>([]); const [stock, setStock] = useState<Row[]>([]); const [product, setProduct] = useState(''); const [qty, setQty] = useState('1'); const [message, setMessage] = useState('');
-  useEffect(() => { setProducts(staffProjection('products', JSON.parse(localStorage.getItem('biz:products') ?? '[]')) as Row[]); setStock(staffProjection('stock', JSON.parse(localStorage.getItem('biz:stock') ?? '[]')) as Row[]); }, []);
+  useEffect(() => {
+    function load() { setProducts(staffProjection('products', JSON.parse(localStorage.getItem('biz:products') ?? '[]')) as Row[]); setStock(staffProjection('stock', JSON.parse(localStorage.getItem('biz:stock') ?? '[]')) as Row[]); }
+    load(); window.addEventListener('biz:changed', load); window.addEventListener('storage', load);
+    return () => { window.removeEventListener('biz:changed', load); window.removeEventListener('storage', load); };
+  }, []);
   function record() {
     try {
       const p = products.find(p => p.id === product); const count = Number(qty);
       if (!p || !Number.isFinite(count) || count <= 0) { setMessage('ပစ္စည်းနှင့် အရေအတွက် မှန်ကန်စွာ ရွေးပါ။'); return; }
       const rows = JSON.parse(localStorage.getItem('biz:sales') ?? '[]');
       rows.push({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0,10), customer: customer.trim(), product: p["name"], qty: count, price: p["price"], recordedBy: profile.id });
-      localStorage.setItem('biz:sales', JSON.stringify(rows)); setMessage('အရောင်းစာရင်း သိမ်းပြီးပါပြီ။'); setQty('1'); setCustomer('');
-    } catch { setMessage('စာရင်းသိမ်းမရပါ။'); }
+      saveSales(rows); setMessage('အရောင်းစာရင်း သိမ်းပြီးပါပြီ။'); setQty('1'); setCustomer('');
+    } catch(e) { setMessage(e instanceof Error ? e.message : 'စာရင်းသိမ်းမရပါ။'); }
   }
   return <main className="mx-auto max-w-5xl space-y-6 px-4 py-6"><h1 className="text-2xl font-bold">ဝန်ထမ်း စာမျက်နှာ</h1><nav className="flex flex-wrap gap-2">{([['sales','အရောင်းထည့်ရန်'],['products','ပစ္စည်းရောင်းဈေး'],['stock','ပစ္စည်းလက်ကျန်']] as const).map(([key,label]) => <Button key={key} variant={tab === key ? 'default' : 'outline'} onClick={() => { setTab(key); setMessage(''); }}>{label}</Button>)}</nav>
     {tab === 'sales' && <form onSubmit={e => { e.preventDefault(); record(); }} className="max-w-md space-y-4"><label className="block space-y-2 text-sm"><span>ဖောက်သည်အမည်</span><input value={customer} onChange={e => setCustomer(e.target.value)} className="w-full rounded-md border bg-background px-3 py-2" /></label><label className="block space-y-2 text-sm"><span>ပစ္စည်းအမည်</span><select required aria-label="ပစ္စည်းအမည်" value={product} onChange={e => setProduct(e.target.value)} className="w-full rounded-md border bg-background p-3"><option value="">ရွေးပါ</option>{products.map(p => <option key={p.id} value={p.id}>{p["name"]}</option>)}</select></label><Field label="အရေအတွက်" value={qty} set={setQty} type="number" /><Button>အရောင်းသိမ်းရန်</Button>{message && <p role="status">{message}</p>}</form>}

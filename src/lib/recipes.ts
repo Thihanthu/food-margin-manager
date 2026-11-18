@@ -1,19 +1,27 @@
 import type { Row } from './store';
 
 export type Ingredient = { stockId: string; qty: number };
+export function parseIngredients(text: string): Ingredient[] {
+  const value: unknown = JSON.parse(text);
+  if (!Array.isArray(value) || value.some(v => !v || typeof v.stockId !== 'string' || !v.stockId || !Number.isFinite(v.qty) || v.qty <= 0)) throw new Error('ကုန်ကြမ်းသုံးနှုန်း မမှန်ပါ။');
+  return value;
+}
 export function ingredients(product?: Row): Ingredient[] {
   if (!product?.['recipe']) return [];
-  const value: unknown = JSON.parse(String(product['recipe']));
-  if (!Array.isArray(value) || value.some(v => typeof v?.stockId !== 'string' || !Number.isFinite(v?.qty) || v.qty <= 0)) throw new Error('ကုန်ကြမ်းသုံးနှုန်း မမှန်ပါ။');
-  return value;
+  return parseIngredients(String(product['recipe']));
 }
 const round = (n: number) => Math.round(n * 1e9) / 1e9;
 export function recipeCost(product: Row, stock: Row[]) {
   const recipe = ingredients(product);
-  return recipe.length ? round(recipe.reduce((total, item) => total + item.qty * Number(stock.find(s => s.id === item.stockId)?.['unitCost'] ?? 0), 0)) : Number(product['cost'] ?? 0);
+  return recipe.length ? round(recipe.reduce((total, item) => {
+    const row = stock.find(s => s.id === item.stockId);
+    const price = Number(row?.['unitCost']);
+    if (!row || !Number.isFinite(price) || price < 0 || row['unitCost'] === '') throw new Error('ကုန်ကြမ်းတစ်ယူနစ်ဈေး ဖြည့်ပါ။');
+    return total + item.qty * price;
+  }, 0)) : Number(product['cost'] ?? 0);
 }
 function usage(sale: Row): Ingredient[] {
-  return sale['usage'] ? JSON.parse(String(sale['usage'])) : [];
+  return sale['usage'] ? parseIngredients(String(sale['usage'])) : [];
 }
 export function reconcileSales(previous: Row[], next: Row[], products: Row[], stock: Row[]) {
   const balances = new Map(stock.map(row => [row.id, Number(row['qty'])]));
@@ -21,17 +29,21 @@ export function reconcileSales(previous: Row[], next: Row[], products: Row[], st
   const current = new Map(next.map(row => [row.id, row]));
   const changed = (a: Row, b?: Row) => !b || a['product'] !== b['product'] || Number(a['qty']) !== Number(b['qty']);
   for (const row of previous) if (changed(row, current.get(row.id))) {
-    for (const item of usage(row)) if (balances.has(item.stockId)) balances.set(item.stockId, round(Number(balances.get(item.stockId)) + item.qty));
+    for (const item of usage(row)) {
+      if (!balances.has(item.stockId) || !Number.isFinite(balances.get(item.stockId))) throw new Error('ပြန်ထည့်ရမည့် ကုန်ကြမ်းလက်ကျန်စာရင်း မရှိပါ။');
+      balances.set(item.stockId, round(Number(balances.get(item.stockId)) + item.qty));
+    }
   }
   const sales = next.map(row => {
     const before = old.get(row.id);
-    if (before && !changed(row, before)) return { ...row, usage: before['usage'] ?? '', unitCost: before['unitCost'] ?? '' };
+    if (!Number.isFinite(Number(row['price'])) || Number(row['price']) < 0) throw new Error('ရောင်းဈေး မှန်ကန်စွာ ဖြည့်ပါ။');
+    if (before && !changed(row, before)) return { ...row, ...('usage' in before ? { usage: before['usage'] } : {}), ...('unitCost' in before ? { unitCost: before['unitCost'] } : {}) };
     const product = products.find(p => p['name'] === row['product']);
     const count = Number(row['qty']);
     if (!product || !Number.isFinite(count) || count <= 0) throw new Error('ပစ္စည်းနှင့် အရေအတွက် မှန်ကန်စွာ ရွေးပါ။');
     const used = ingredients(product).map(item => ({ ...item, qty: round(item.qty * count) }));
     for (const item of used) {
-      if (!balances.has(item.stockId)) throw new Error('ကုန်ကြမ်းလက်ကျန်စာရင်း မပြည့်စုံပါ။');
+      if (!balances.has(item.stockId) || !Number.isFinite(balances.get(item.stockId))) throw new Error('ကုန်ကြမ်းလက်ကျန်စာရင်း မပြည့်စုံပါ။');
       const remaining = round(Number(balances.get(item.stockId)) - item.qty);
       if (remaining < 0) throw new Error('ကုန်ကြမ်းလက်ကျန် မလုံလောက်ပါ။');
       balances.set(item.stockId, remaining);
@@ -39,6 +51,11 @@ export function reconcileSales(previous: Row[], next: Row[], products: Row[], st
     return { ...row, usage: JSON.stringify(used), unitCost: recipeCost(product, stock) };
   });
   return { sales, stock: stock.map(row => ({ ...row, qty: balances.get(row.id) ?? row['qty'] ?? 0 })) };
+}
+export function saleProfit(row: Row, products: Row[], stock: Row[]) {
+  const product = products.find(p => p['name'] === row['product']);
+  const cost = typeof row['unitCost'] === 'number' ? row['unitCost'] : product ? recipeCost(product, stock) : 0;
+  return round(Number(row['qty']) * (Number(row['price']) - cost));
 }
 export function saveSales(next: Row[]) {
   const read = (key: string): Row[] => JSON.parse(localStorage.getItem('biz:' + key) ?? '[]');
