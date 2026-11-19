@@ -1,4 +1,5 @@
 # Tasks
+- [ ] Add Burmese voice entry using YeeNyunn/nara-sar; blocked on choosing online transcription service versus an offline Android runtime. Released Python runner requires ~366 MB ONNX + ~84 MB language model and the exact beam/syllable decoder; no ready browser integration or hosted inference provider is documented. Do not substitute another model or greedy decoding.
 - [x] Add customer names to owner and staff sale entry; verify offline persistence.
 - [x] Add per-serving ingredient recipes with fractional quantities, calculated cost, and stock deduction for owner/staff sales, including edits and deletions; verified backup export/restore and desktop/mobile light/dark screens.
 - [x] Preserve offline owner/staff login until explicit logout; browser-verified reload and logout, with saved-session and account-removal tests passing.
