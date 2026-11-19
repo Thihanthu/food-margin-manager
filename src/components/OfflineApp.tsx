@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   LogOut,
   ShieldCheck,
@@ -498,6 +498,35 @@ function StaffPanel({ profile }: { profile: Profile }) {
   const [product, setProduct] = useState("");
   const [qty, setQty] = useState("1");
   const [message, setMessage] = useState("");
+  const voiceCursor = useRef<{ start: number; end: number } | null>(null);
+  const customerInput = useRef<HTMLInputElement | null>(null);
+  const pendingCaret = useRef<number | null>(null);
+  useEffect(() => {
+    if (pendingCaret.current === null || !customerInput.current) return;
+    customerInput.current.focus();
+    customerInput.current.setSelectionRange(pendingCaret.current, pendingCaret.current);
+    pendingCaret.current = null;
+  }, [customer]);
+  function rememberVoiceCursor() {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && active.dataset.voiceCursor === "customer") {
+      voiceCursor.current = {
+        start: active.selectionStart ?? active.value.length,
+        end: active.selectionEnd ?? active.value.length,
+      };
+    }
+  }
+  function insertVoiceText(text: string) {
+    const cursor = voiceCursor.current;
+    if (!cursor) return false;
+    const start = Math.min(cursor.start, customer.length);
+    const end = Math.min(cursor.end, customer.length);
+    const nextCaret = start + text.length;
+    voiceCursor.current = { start: nextCaret, end: nextCaret };
+    pendingCaret.current = nextCaret;
+    setCustomer(customer.slice(0, start) + text + customer.slice(end));
+    return true;
+  }
   const selectedProduct = products.find((item) => item.id === product);
   const payable = selectedProduct ? saleTotal(qty, selectedProduct["price"]) : null;
   useEffect(() => {
@@ -586,6 +615,8 @@ function StaffPanel({ profile }: { profile: Profile }) {
           >
             <VoiceSaleEntry
               products={products}
+              onBeforeRecord={rememberVoiceCursor}
+              onInsertText={insertVoiceText}
               onApply={({ productId, qty, customer }) => {
                 setProduct(productId);
                 setQty(String(qty));
@@ -595,6 +626,8 @@ function StaffPanel({ profile }: { profile: Profile }) {
             <label className="block space-y-2 text-sm">
               <span>ဖောက်သည်အမည်</span>
               <input
+                ref={customerInput}
+                data-voice-cursor="customer"
                 value={customer}
                 onChange={(e) => setCustomer(e.target.value)}
                 className="w-full rounded-md border bg-background px-3 py-2"

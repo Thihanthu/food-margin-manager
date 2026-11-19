@@ -5,8 +5,10 @@ import { useTable, num, sum, ks, uid, type Row } from "@/lib/store";
 import { OfflineApp } from "@/components/OfflineApp";
 import { Button } from "@/components/ui/button";
 import { CustomerPanel } from "@/components/CustomerPanel";
+import { ExpenseSummaryPanel } from "@/components/ExpenseSummaryPanel";
 import { RecipePanel } from "@/components/RecipePanel";
 import { SalesPanel } from "@/components/SalesPanel";
+import { SupplierPanel } from "@/components/SupplierPanel";
 import { recipeCost, saleProfit, saveSales } from "@/lib/recipes";
 import {
   BarChart3,
@@ -110,6 +112,7 @@ function Index() {
   const [suppliers, setSuppliers] = useTable("suppliers", [
     { id: uid(), name: "ဦးဘ", phone: "09xxxxxxx", goods: "ဆန်", owed: 0 },
   ]);
+  const [supplierLedger, setSupplierLedger] = useTable("supplierLedger", []);
   const [customers, setCustomers] = useTable("customers", []);
   const saleT = (r: Row) => num(r["qty"]) * num(r["price"]);
   const cost = (r: Row) => {
@@ -283,10 +286,11 @@ function Index() {
           <EditableTable
             rows={products}
             setRows={setProducts}
-            blank={{ name: "", price: 0, cost: 0 }}
+            blank={{ name: "", price: 0, cost: 0, voiceAliases: "" }}
             cols={
               [
                 { key: "name", label: "ပစ္စည်းအမည်" },
+                { key: "voiceAliases", label: "အသံဖမ်းမှားလေ့ရှိသော အမည်များ (၊ ဖြင့်ခွဲ)" },
                 { key: "price", label: "ရောင်းဈေး", type: "number" },
                 { key: "cost", label: "အရင်း (ကိုယ်တိုင်ဖြည့်)", type: "number" },
                 {
@@ -385,19 +389,14 @@ function Index() {
           />
         )}
         {tab === 8 && (
-          <EditableTable
-            rows={suppliers}
-            setRows={setSuppliers}
-            blank={{ name: "", phone: "", goods: "", owed: 0 }}
-            cols={[
-              { key: "name", label: "ကုန်သည်အမည်" },
-              { key: "phone", label: "ဖုန်း" },
-              { key: "goods", label: "ပေးသွင်းသောပစ္စည်း" },
-              { key: "owed", label: "ပေးရန်ကျန်ငွေ", type: "number" },
-            ]}
+          <SupplierPanel
+            suppliers={suppliers}
+            setSuppliers={setSuppliers}
+            entries={supplierLedger}
+            setEntries={setSupplierLedger}
           />
         )}
-        {tab === 9 && <CustomerPanel rows={customers} setRows={setCustomers} />}
+        {tab === 9 && <CustomerPanel rows={customers} setRows={setCustomers} sales={sales} />}
         {tab === 11 && <RecipePanel products={products} stock={stock} setProducts={setProducts} />}
         {tab === 10 && (
           <div className="space-y-6">
@@ -445,6 +444,14 @@ function Index() {
                 </div>
               </div>
             ))}
+            <ExpenseSummaryPanel
+              sales={sales}
+              products={products}
+              stock={stock}
+              daily={daily}
+              supplierEntries={supplierLedger}
+              suppliers={suppliers}
+            />
           </div>
         )}
       </main>

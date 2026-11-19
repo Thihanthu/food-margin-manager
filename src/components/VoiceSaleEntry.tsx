@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Mic, Square, Check, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Row } from "@/lib/store";
-import { parseVoiceSale } from "@/lib/voice-sale";
+import { parseVoiceCustomer, parseVoiceQuantity, parseVoiceSale } from "@/lib/voice-sale";
 
 const companionUrl = "http://127.0.0.1:8765";
 
@@ -45,10 +45,16 @@ function encodeWav(buffer: AudioBuffer): Blob {
 
 export function VoiceSaleEntry({
   products,
+  customers = [],
   onApply,
+  onBeforeRecord,
+  onInsertText,
 }: {
   products: Row[];
+  customers?: Row[];
   onApply: (value: { productId: string; qty: number; customer: string }) => void;
+  onBeforeRecord?: () => void;
+  onInsertText?: (text: string) => boolean;
 }) {
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -57,14 +63,18 @@ export function VoiceSaleEntry({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const parsed = transcript ? parseVoiceSale(transcript, products) : null;
-  const matchedProduct = parsed ? products.find((item) => item.id === parsed.productId) : undefined;
+  const parsed = transcript ? parseVoiceSale(transcript, products, customers) : null;
+  const [manualProductId, setManualProductId] = useState("");
+  const selectedProductId = parsed?.productId ?? manualProductId;
+  const matchedProduct = products.find((item) => item.id === selectedProductId);
+  const quantity = parsed?.qty ?? (transcript ? parseVoiceQuantity(transcript) : null);
 
   useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), []);
 
   async function startRecording() {
     setMessage("");
     setTranscript("");
+    setManualProductId("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -122,13 +132,29 @@ export function VoiceSaleEntry({
   }
 
   function applyTranscript() {
-    const parsed = parseVoiceSale(transcript, products);
-    if (!parsed) {
-      setMessage("ပစ္စည်းအမည်နှင့် အရေအတွက်ကို transcript မှ ရှာမတွေ့ပါ။");
+    const value = parsed
+      ? parsed
+      : matchedProduct
+        ? {
+            productId: matchedProduct.id,
+            qty: quantity ?? 1,
+            customer: parseVoiceCustomer(transcript, customers),
+          }
+        : null;
+    if (!value) {
+      setMessage("စာရင်းမှ ပစ္စည်းအမည်ကို ရွေးပါ၊ သို့မဟုတ် transcript ကို ပြင်ပါ။");
       return;
     }
-    onApply(parsed);
+    onApply(value);
     setMessage("အသံစာသားကို စာရင်းဖောင်သို့ ထည့်ပြီးပါပြီ။");
+  }
+
+  function insertTranscriptAtCursor() {
+    if (!onInsertText?.(transcript)) {
+      setMessage("အသံမစခင် စာသားထည့်လိုသည့် ဖောင်ကွက်ထဲ cursor ချပြီးမှ အသံပြောပါ။");
+      return;
+    }
+    setMessage("အသံစာသားကို cursor နေရာတွင် ထည့်ပြီးပါပြီ။");
   }
 
   return (
@@ -148,6 +174,7 @@ export function VoiceSaleEntry({
           <Button
             type="button"
             variant="outline"
+            onPointerDown={onBeforeRecord}
             onClick={() => void startRecording()}
             disabled={busy}
           >
@@ -170,19 +197,55 @@ export function VoiceSaleEntry({
               className="w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm"
             />
           </label>
+          <p className="mt-2 text-xs text-muted-foreground">
+            နာမည်တွေ မကြာခဏမှားပါက ပစ္စည်း/ဖောက်သည်စာရင်းရှိ “အသံဖမ်းမှားလေ့ရှိသော အမည်များ” ထဲတွင် Nara ထုတ်ပေးသည့်စာသားကို
+            ထည့်ပါ။ ဖောင်ဖြည့်ရာတွင် သိမ်းထားသောအမည်ကို အသုံးပြုပါမည်။
+          </p>
           {parsed && matchedProduct ? (
             <p className="mt-2 text-sm font-medium text-primary">
               စာရင်းထဲသို့ ထည့်မည့်အချက်အလက်: {matchedProduct["name"]} × {parsed.qty}
               {parsed.customer ? ` · ${parsed.customer}` : ""}
             </p>
           ) : (
-            <p className="mt-2 text-xs text-muted-foreground">
-              ပစ္စည်းအမည်ကို ရှိပြီးသား ပစ္စည်းစာရင်းနဲ့ မကိုက်သေးပါ။ စာသားကို ပြင်စစ်ပါ။
-            </p>
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                ပစ္စည်းအမည် မကိုက်ပါက စာရင်းမှ မှန်ကန်သောပစ္စည်းကို ရွေးပါ။
+              </p>
+              <select
+                aria-label="အသံအရောင်းအတွက် ပစ္စည်းရွေးပါ"
+                value={manualProductId}
+                onChange={(event) => setManualProductId(event.target.value)}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              >
+                <option value="">ပစ္စည်းရွေးပါ</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product["name"]}
+                  </option>
+                ))}
+              </select>
+              {matchedProduct && (
+                <p className="text-sm font-medium text-primary">
+                  စာရင်းထဲသို့ ထည့်မည့်အချက်အလက်: {matchedProduct["name"]} × {quantity ?? 1}
+                </p>
+              )}
+            </div>
           )}
-          <Button type="button" size="sm" className="mt-3" onClick={applyTranscript}>
-            <Check className="size-4" /> Form ထဲသို့ ထည့်ရန်
-          </Button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={applyTranscript}
+              disabled={!parsed && !matchedProduct}
+            >
+              <Check className="size-4" /> Form ဖြည့်ရန်
+            </Button>
+            {onInsertText && (
+              <Button type="button" size="sm" variant="outline" onClick={insertTranscriptAtCursor}>
+                Cursor နေရာတွင် စာသားထည့်ရန်
+              </Button>
+            )}
+          </div>
         </div>
       )}
       {message && (

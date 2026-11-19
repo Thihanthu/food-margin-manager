@@ -13,6 +13,10 @@ const burmeseDigits: Record<string, number> = {
   "၉": 9,
 };
 
+const builtInProductAliases: Record<string, string[]> = {
+  လက်ဖက်ရည်: ["အထိုက် ရေ"],
+};
+
 export function normalizeDigits(text: string): string {
   return text.replace(/[၀-၉]/g, (digit) => String(burmeseDigits[digit] ?? digit));
 }
@@ -35,12 +39,25 @@ function editDistance(left: string[], right: string[]): number {
 
 function findProduct(transcript: string, products: Row[]): Row | undefined {
   const normalize = (value: string) => value.normalize("NFC").replace(/\s+/g, "");
-  const exact = [...products]
-    .sort((a, b) => String(b["name"]).length - String(a["name"]).length)
-    .find((item) => transcript.includes(normalize(String(item["name"]))));
-  if (exact) return exact;
+  const normalizedTranscript = normalize(transcript);
+  const exactMatches = products
+    .flatMap((product) => {
+      const name = String(product["name"] ?? "");
+      const aliases = String(product["voiceAliases"] ?? "").split(/[၊,\n]+/);
+      return [name, ...(builtInProductAliases[name] ?? []), ...aliases]
+        .map((term) => ({ product, term: normalize(term.trim()) }))
+        .filter(({ term }) => term && normalizedTranscript.includes(term));
+    })
+    .sort((a, b) => b.term.length - a.term.length);
+  if (exactMatches.length) {
+    const bestLength = exactMatches[0].term.length;
+    const bestMatches = exactMatches.filter((match) => match.term.length === bestLength);
+    return new Set(bestMatches.map((match) => match.product.id)).size === 1
+      ? bestMatches[0].product
+      : undefined;
+  }
 
-  const text = Array.from(normalize(transcript));
+  const text = Array.from(normalizedTranscript);
   let closest: { product: Row; distance: number } | undefined;
   let tied = false;
   for (const product of products) {
@@ -74,13 +91,48 @@ function findProduct(transcript: string, products: Row[]): Row | undefined {
 export function parseVoiceSale(
   transcript: string,
   products: Row[],
+  customers: Row[] = [],
 ): { productId: string; qty: number; customer: string } | null {
   const normalized = normalizeDigits(transcript).normalize("NFC").replace(/\s+/g, " ").trim();
   if (!normalized) return null;
 
   const product = findProduct(normalized, products);
   if (!product) return null;
+  const qty = parseVoiceQuantity(normalized);
+  if (qty === null) return null;
 
+  const customer = parseVoiceCustomer(normalized, customers);
+
+  return { productId: product.id, qty, customer };
+}
+
+export function parseVoiceCustomer(transcript: string, customers: Row[] = []): string {
+  const normalize = (value: string) => value.normalize("NFC").replace(/\s+/g, "");
+  const normalizedTranscript = normalize(transcript);
+  const matchingCustomer = customers
+    .flatMap((customer) => {
+      const aliases = String(customer["voiceAliases"] ?? "").split(/[၊,\n]+/);
+      return [String(customer["name"] ?? ""), ...aliases]
+        .map((term) => ({ customer, term: normalize(term.trim()) }))
+        .filter(({ term }) => term && normalizedTranscript.includes(term));
+    })
+    .sort((a, b) => b.term.length - a.term.length);
+  if (matchingCustomer.length) {
+    const bestLength = matchingCustomer[0].term.length;
+    const bestMatches = matchingCustomer.filter((match) => match.term.length === bestLength);
+    if (new Set(bestMatches.map((match) => match.customer.id)).size === 1) {
+      return String(bestMatches[0].customer["name"] ?? "");
+    }
+  }
+
+  const customerMatch = transcript
+    .normalize("NFC")
+    .match(/(?:ဖောက်သည်|ဝယ်သူ)\s*([^\d၊၊။]+?)(?:\s+(?:ဝယ်|ယူ|မှာ|ပေး|ထည့်))/);
+  return customerMatch ? customerMatch[1].replace(/(?:က|ကို)\s*$/, "").trim() : "";
+}
+
+export function parseVoiceQuantity(transcript: string): number | null {
+  const normalized = normalizeDigits(transcript).normalize("NFC").replace(/\s+/g, " ").trim();
   const digitMatch = normalized.match(
     /(?:အရေအတွက်|အုပ်(?:စ်)?|ပွဲ|ယာ|ခု|ပေါင်း)?\s*(\d+(?:\.\d+)?)\s*(?:ခု|ပွဲ|ယာ|အုပ်|ပေါင်း)?/,
   );
@@ -102,11 +154,5 @@ export function parseVoiceSale(
     new RegExp(`${word}\\s*(?:ခု|ပွဲ|ယာ|အုပ်|ခွက်)?`).test(normalized),
   );
   const qty = digitMatch ? Number(digitMatch[1]) : spokenNumber ? spokenNumbers[spokenNumber] : 1;
-  if (!Number.isFinite(qty) || qty <= 0) return null;
-
-  let customer = "";
-  const customerMatch = normalized.match(/(?:ဖောက်သည်|ဝယ်သူ)\s*([^\d၊၊။]+?)(?:\s+(?:ဝယ်|ယူ|မှာ|ပေး|ထည့်))/);
-  if (customerMatch) customer = customerMatch[1].replace(/(?:က|ကို)\s*$/, "").trim();
-
-  return { productId: product.id, qty, customer };
+  return Number.isFinite(qty) && qty > 0 ? qty : null;
 }

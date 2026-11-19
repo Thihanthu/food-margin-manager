@@ -10,8 +10,17 @@ import { isPreviewHost } from "@/lib/pwa-registration";
 describe("Staff privacy", () => {
   it("excludes product cost and profit", () => {
     expect(
-      staffProjection("products", [{ id: "1", name: "Tea", price: 1000, cost: 400, profit: 600 }]),
-    ).toEqual([{ id: "1", name: "Tea", price: 1000 }]);
+      staffProjection("products", [
+        {
+          id: "1",
+          name: "Tea",
+          price: 1000,
+          voiceAliases: "tea misheard",
+          cost: 400,
+          profit: 600,
+        },
+      ]),
+    ).toEqual([{ id: "1", name: "Tea", price: 1000, voiceAliases: "tea misheard" }]);
   });
   it("excludes total revenue and sales records", () => {
     expect(staffProjection("sales", [{ id: "1", totalRevenue: 50000 }])).toEqual([{}]);
@@ -71,6 +80,16 @@ describe("Backup", () => {
     expect(parseBackup(JSON.stringify({ app: "food-margin-manager", version: 1, tables }))).toEqual(
       tables,
     );
+  });
+  it("accepts older backups without the supplier ledger", () => {
+    const tables = Object.fromEntries(
+      TABLE_KEYS.filter((key) => key !== "supplierLedger").map((key) => [key, []]),
+    );
+    expect(
+      parseBackup(JSON.stringify({ app: "food-margin-manager", version: 1, tables }))[
+        "supplierLedger"
+      ],
+    ).toEqual([]);
   });
   it("rejects malformed tables before restore", () => {
     expect(() =>

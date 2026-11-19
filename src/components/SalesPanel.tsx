@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ks, uid, type Row } from "@/lib/store";
@@ -19,14 +19,55 @@ export function SalesPanel({
 }) {
   const [draft, setDraft] = useState<Row | null>(null);
   const [error, setError] = useState("");
+  const voiceCursor = useRef<{ start: number; end: number } | null>(null);
+  const customerInput = useRef<HTMLInputElement | null>(null);
+  const pendingCaret = useRef<number | null>(null);
+  const draftCustomer = draft?.["customer"];
+  useEffect(() => {
+    if (pendingCaret.current === null || !customerInput.current) return;
+    customerInput.current.focus();
+    customerInput.current.setSelectionRange(pendingCaret.current, pendingCaret.current);
+    pendingCaret.current = null;
+  }, [draftCustomer]);
+  function rememberVoiceCursor() {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && active.dataset.voiceCursor === "customer") {
+      voiceCursor.current = {
+        start: active.selectionStart ?? active.value.length,
+        end: active.selectionEnd ?? active.value.length,
+      };
+    }
+  }
+  function insertVoiceText(text: string) {
+    const cursor = voiceCursor.current;
+    if (!cursor || !draft) return false;
+    const value = String(draft["customer"] ?? "");
+    const start = Math.min(cursor.start, value.length);
+    const end = Math.min(cursor.end, value.length);
+    const nextCaret = start + text.length;
+    voiceCursor.current = { start: nextCaret, end: nextCaret };
+    pendingCaret.current = nextCaret;
+    setDraft({ ...draft, customer: value.slice(0, start) + text + value.slice(end) });
+    return true;
+  }
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!draft) return;
     try {
+      const customerName = String(draft["customer"] ?? "").trim();
+      const customer = customers.find(
+        (row) =>
+          String(row["name"] ?? "")
+            .trim()
+            .toLocaleLowerCase() === customerName.toLocaleLowerCase(),
+      );
+      const savedDraft: Row = { ...draft, customer: customerName };
+      if (customer) savedDraft.customerId = customer.id;
+      else delete savedDraft.customerId;
       save(
-        rows.some((row) => row.id === draft.id)
-          ? rows.map((row) => (row.id === draft.id ? draft : row))
-          : [...rows, draft],
+        rows.some((row) => row.id === savedDraft.id)
+          ? rows.map((row) => (row.id === savedDraft.id ? savedDraft : row))
+          : [...rows, savedDraft],
       );
       setDraft(null);
       setError("");
@@ -57,6 +98,9 @@ export function SalesPanel({
       </div>
       <VoiceSaleEntry
         products={products}
+        customers={customers}
+        onBeforeRecord={rememberVoiceCursor}
+        onInsertText={insertVoiceText}
         onApply={({ productId, qty, customer }) => {
           const product = products.find((row) => row.id === productId);
           setDraft((current) => ({
@@ -105,11 +149,13 @@ export function SalesPanel({
             <label key={key} className="min-w-0 space-y-2">
               <span className="block">{label}</span>
               <input
+                ref={key === "customer" ? customerInput : undefined}
                 required={key !== "customer"}
                 type={type}
                 step={type === "number" ? "any" : undefined}
                 min={key === "qty" ? "0.000000001" : key === "price" ? "0" : undefined}
                 list={key === "customer" ? "sale-customers" : undefined}
+                data-voice-cursor={key === "customer" ? "customer" : undefined}
                 value={draft[key]}
                 onChange={(e) =>
                   setDraft({
