@@ -24,3 +24,26 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Offline Myanmar voice entry
+
+Nara SAR runs locally through a Python 3.11 companion process. The model is not
+included in Git because its INT8 acoustic model is about 366 MB. On macOS with
+Homebrew, install Python and run the downloader from the repository directory:
+
+```sh
+brew install python@3.11
+python3.11 scripts/setup_nara.py
+```
+
+If a Hugging Face download is interrupted, rerun the setup command; partial
+downloads are resumed. Then run the companion server in one terminal and the
+app in another:
+
+```sh
+python3.11 scripts/nara_voice_server.py
+npm run dev
+```
+
+The companion binds to `127.0.0.1` and transcribes audio locally. See `NOTICE`
+for Nara SAR and upstream model attribution.
