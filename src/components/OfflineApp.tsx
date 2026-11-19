@@ -26,6 +26,7 @@ import {
 import { EditableTable } from "@/components/EditableTable";
 import { ks, type Row } from "@/lib/store";
 import { saleTotal, saveSales } from "@/lib/recipes";
+import { VoiceSaleEntry } from "@/components/VoiceSaleEntry";
 import {
   APP_SETTINGS_KEY,
   applyAppSettings,
@@ -583,6 +584,14 @@ function StaffPanel({ profile }: { profile: Profile }) {
             }}
             className="max-w-lg space-y-4"
           >
+            <VoiceSaleEntry
+              products={products}
+              onApply={({ productId, qty, customer }) => {
+                setProduct(productId);
+                setQty(String(qty));
+                setCustomer(customer);
+              }}
+            />
             <label className="block space-y-2 text-sm">
               <span>ဖောက်သည်အမည်</span>
               <input
