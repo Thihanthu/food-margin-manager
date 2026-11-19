@@ -55,23 +55,22 @@ export function SalesPanel({
           အရောင်းထည့်ရန်
         </Button>
       </div>
+      <VoiceSaleEntry
+        products={products}
+        onApply={({ productId, qty, customer }) => {
+          const product = products.find((row) => row.id === productId);
+          setDraft((current) => ({
+            id: current?.id ?? uid(),
+            date: current?.date ?? new Date().toISOString().slice(0, 10),
+            customer: customer || current?.["customer"] || "",
+            product: product?.["name"] ?? current?.["product"] ?? "",
+            qty,
+            price: product?.["price"] ?? current?.["price"] ?? 0,
+          }));
+        }}
+      />
       {draft && (
         <form onSubmit={submit} className="grid gap-4 border-y py-5 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <VoiceSaleEntry
-              products={products}
-              onApply={({ productId, qty, customer }) => {
-                const product = products.find((row) => row.id === productId);
-                setDraft({
-                  ...draft,
-                  product: product?.["name"] ?? "",
-                  qty,
-                  customer: customer || draft["customer"],
-                  price: product?.["price"] ?? 0,
-                });
-              }}
-            />
-          </div>
           <label className="space-y-2">
             <span className="block">ပစ္စည်းအမည်</span>
             <select
