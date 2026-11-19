@@ -20,10 +20,26 @@ describe("Myanmar voice sale parsing", () => {
     });
   });
 
+  it("uses the saved product spelling when the transcript has a small spelling error", () => {
+    expect(parseVoiceSale("မုန့်ဟင်းခါးး ၂ပွဲ", products)).toEqual({
+      productId: "noodles",
+      qty: 2,
+      customer: "",
+    });
+  });
+
   it("defaults quantity to one", () => {
     expect(parseVoiceSale("လက်ဖက်ရည် တစ်ခွက်", products)).toEqual({
       productId: "tea",
       qty: 1,
+      customer: "",
+    });
+  });
+
+  it("parses Burmese number words", () => {
+    expect(parseVoiceSale("လက်ဖက်ရည် နှစ်ခွက်", products)).toEqual({
+      productId: "tea",
+      qty: 2,
       customer: "",
     });
   });

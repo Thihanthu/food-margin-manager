@@ -57,6 +57,8 @@ export function VoiceSaleEntry({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const parsed = transcript ? parseVoiceSale(transcript, products) : null;
+  const matchedProduct = parsed ? products.find((item) => item.id === parsed.productId) : undefined;
 
   useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), []);
 
@@ -156,8 +158,28 @@ export function VoiceSaleEntry({
       </div>
       {transcript && (
         <div className="mt-4 rounded-xl border bg-background p-3">
-          <p className="text-xs text-muted-foreground">အသံမှ စာသား</p>
-          <p className="mt-1 break-words">{transcript}</p>
+          <label className="block space-y-2">
+            <span className="text-xs text-muted-foreground">အသံမှ စာသား (လိုအပ်လျှင် ပြင်နိုင်သည်)</span>
+            <textarea
+              rows={2}
+              value={transcript}
+              onChange={(event) => {
+                setTranscript(event.target.value);
+                setMessage("");
+              }}
+              className="w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm"
+            />
+          </label>
+          {parsed && matchedProduct ? (
+            <p className="mt-2 text-sm font-medium text-primary">
+              စာရင်းထဲသို့ ထည့်မည့်အချက်အလက်: {matchedProduct["name"]} × {parsed.qty}
+              {parsed.customer ? ` · ${parsed.customer}` : ""}
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">
+              ပစ္စည်းအမည်ကို ရှိပြီးသား ပစ္စည်းစာရင်းနဲ့ မကိုက်သေးပါ။ စာသားကို ပြင်စစ်ပါ။
+            </p>
+          )}
           <Button type="button" size="sm" className="mt-3" onClick={applyTranscript}>
             <Check className="size-4" /> Form ထဲသို့ ထည့်ရန်
           </Button>
