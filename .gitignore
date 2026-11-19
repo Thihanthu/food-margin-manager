@@ -20,6 +20,8 @@ dist-ssr
 .wrangler/
 .dev.vars
 nara-sar/
+__pycache__/
+*.py[cod]
 
 # Editor directories and files
 .vscode/*
