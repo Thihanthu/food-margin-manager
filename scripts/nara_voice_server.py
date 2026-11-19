@@ -14,6 +14,18 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("NARA_PORT", "8765"))
 MODEL_DIR = Path(os.environ.get("NARA_MODEL_DIR", str(Path(__file__).resolve().parent.parent / "nara-sar")))
 TRANSCRIBE = MODEL_DIR / "transcribe.py"
+REQUIRED_FILES = [
+    TRANSCRIBE,
+    MODEL_DIR / "sar.json",
+    MODEL_DIR / "language.lm",
+    MODEL_DIR / "sar_decoder.py",
+    MODEL_DIR / "sar_syllables.py",
+    MODEL_DIR / "onnx" / "acoustic.onnx",
+]
+
+
+def missing_model_files():
+    return [str(path.relative_to(MODEL_DIR)) for path in REQUIRED_FILES if not path.is_file()]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -40,15 +52,22 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/health":
             self.send_json(404, {"error": "Not found"})
             return
-        ready = TRANSCRIBE.exists()
-        self.send_json(200, {"ready": ready, "engine": "Nara SAR", "modelDir": str(MODEL_DIR)})
+        missing = missing_model_files()
+        self.send_json(200, {"ready": not missing, "engine": "Nara SAR", "missing": missing})
 
     def do_POST(self):
         if self.path != "/transcribe":
             self.send_json(404, {"error": "Not found"})
             return
-        if not TRANSCRIBE.exists():
-            self.send_json(503, {"error": "Nara model is not installed. Run scripts/setup_nara.py first."})
+        missing = missing_model_files()
+        if missing:
+            self.send_json(
+                503,
+                {
+                    "error": "Nara model download is incomplete. Run scripts/setup_nara.py again.",
+                    "missing": missing,
+                },
+            )
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
