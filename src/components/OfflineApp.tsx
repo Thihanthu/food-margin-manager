@@ -18,13 +18,15 @@ import {
   makeProfile,
   passwordHash,
   parseBackup,
+  resetBusinessData,
+  recordShiftEnd,
   restoreSession,
   staffProjection,
   type AccessData,
   type Profile,
 } from "@/lib/offline-access";
 import { EditableTable } from "@/components/EditableTable";
-import { ks, type Row } from "@/lib/store";
+import { ks, useTable, type Row } from "@/lib/store";
 import { saleTotal, saveSales } from "@/lib/recipes";
 import { VoiceSaleEntry } from "@/components/VoiceSaleEntry";
 import {
@@ -40,12 +42,10 @@ export function OfflineApp({ children }: { children: ReactNode }) {
   const [access, setAccess] = useState<AccessData | null>(null);
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Profile | null>(null);
-  const [username, setUsername] = useState("");
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [manage, setManage] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   useEffect(() => {
     applyAppSettings(loadAppSettings());
     function loadAccess() {
@@ -83,31 +83,49 @@ export function OfflineApp({ children }: { children: ReactNode }) {
     localStorage.setItem(SESSION_KEY, profile.id);
     setSession(profile);
   };
-  async function submit() {
+  async function authenticate({
+    name,
+    username,
+    password,
+  }: {
+    name: string;
+    username: string;
+    password: string;
+  }) {
+    if (!access) {
+      if (!name.trim() || !username.trim() || password.length < 8)
+        throw new Error("အမည်၊ အကောင့်အမည်နှင့် အနည်းဆုံး ၈ လုံးပါ စကားဝှက် ဖြည့်ပါ။");
+      const profile = await makeProfile(username, name, password);
+      saveAccess({ profiles: [profile], roles: { [profile.id]: "admin" } });
+      signIn(profile);
+      return;
+    }
+
+    const profile = access.profiles.find((p) => p.username === username.trim().toLowerCase());
+    if (!profile || (await passwordHash(password, profile.salt)) !== profile.hash)
+      throw new Error("အကောင့်အမည် သို့မဟုတ် စကားဝှက် မှားနေပါသည်။");
+    if (!restoreSession(access, profile.id)) throw new Error("ဤအကောင့်ကို အသုံးပြုခွင့် မရှိပါ။");
+    signIn(profile);
+  }
+  async function runLogin(action: () => Promise<void>) {
     setBusy(true);
     setError("");
     try {
-      if (!access) {
-        if (!name.trim() || !username.trim() || password.length < 8)
-          throw new Error("အမည်၊ အကောင့်အမည်နှင့် အနည်းဆုံး ၈ လုံးပါ စကားဝှက် ဖြည့်ပါ။");
-        const profile = await makeProfile(username, name, password);
-        saveAccess({ profiles: [profile], roles: { [profile.id]: "admin" } });
-        signIn(profile);
-      } else {
-        const profile = access.profiles.find((p) => p.username === username.trim().toLowerCase());
-        if (!profile || (await passwordHash(password, profile.salt)) !== profile.hash)
-          throw new Error("အကောင့်အမည် သို့မဟုတ် စကားဝှက် မှားနေပါသည်။");
-        if (!restoreSession(access, profile.id)) throw new Error("ဤအကောင့်ကို အသုံးပြုခွင့် မရှိပါ။");
-        signIn(profile);
-      }
-      setPassword("");
-      setUsername("");
-      setName("");
+      await action();
     } catch (e) {
       setError(e instanceof Error ? e.message : "သိမ်းမရပါ။");
     } finally {
       setBusy(false);
     }
+  }
+  function submitWeb(formData: FormData) {
+    void runLogin(() =>
+      authenticate({
+        name: String(formData.get("name") ?? ""),
+        username: String(formData.get("username") ?? ""),
+        password: String(formData.get("password") ?? ""),
+      }),
+    );
   }
   if (!ready) return <main className="p-8 text-center">ခဏစောင့်ပါ…</main>;
   if (!session)
@@ -132,12 +150,51 @@ export function OfflineApp({ children }: { children: ReactNode }) {
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
-              void submit();
+              submitWeb(new FormData(e.currentTarget));
             }}
           >
-            {!access && <Field label="အမည်" value={name} set={setName} />}
-            <Field label="အကောင့်အမည်" value={username} set={setUsername} />
-            <Field label="စကားဝှက်" value={password} set={setPassword} type="password" />
+            {!access && (
+              <label className="block space-y-2 text-sm font-medium">
+                <span>အမည်</span>
+                <input
+                  required
+                  name="name"
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="w-full rounded-md border bg-background px-3 py-2"
+                />
+              </label>
+            )}
+            <label className="block space-y-2 text-sm font-medium">
+              <span>အကောင့်အမည်</span>
+              <input
+                required
+                name="username"
+                type="text"
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                className="w-full rounded-md border bg-background px-3 py-2"
+              />
+            </label>
+            <label className="block space-y-2 text-sm font-medium">
+              <span>စကားဝှက်</span>
+              <input
+                required
+                name="password"
+                type="password"
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                minLength={access ? undefined : 8}
+                className="w-full rounded-md border bg-background px-3 py-2"
+              />
+            </label>
             {error && (
               <p
                 role="alert"
@@ -153,37 +210,64 @@ export function OfflineApp({ children }: { children: ReactNode }) {
         </section>
       </main>
     );
-  const admin = access?.roles[session.id] === "admin";
+  const activeProfile = session;
+  const admin = access?.roles[activeProfile.id] === "admin";
+  function signOut() {
+    setLogoutError("");
+    if (!admin) {
+      try {
+        recordShiftEnd(activeProfile);
+        window.dispatchEvent(new Event("biz:changed"));
+      } catch (error) {
+        setLogoutError(error instanceof Error ? error.message : "အလုပ်ဆင်းချိန် သိမ်းမရပါ။");
+        return;
+      }
+    }
+    localStorage.removeItem(SESSION_KEY);
+    setSession(null);
+    setManage(false);
+    setError("");
+  }
   return (
     <>
+      {logoutError && (
+        <p
+          role="alert"
+          className="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive"
+        >
+          {logoutError}
+        </p>
+      )}
       <div className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
           <ShieldCheck className="text-primary" />
-          <span className="flex-1 font-semibold">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold sm:text-base">
             {session.name} · {admin ? "Admin" : "User"}
           </span>
           {admin && (
-            <Button variant="outline" onClick={() => setManage(!manage)}>
-              <Users />
+            <Button
+              variant="outline"
+              size="sm"
+              className="px-2 text-xs sm:px-3 sm:text-sm"
+              onClick={() => setManage(!manage)}
+            >
+              <Users className="size-4" />
               အကောင့် / Backup
             </Button>
           )}
           <Button
+            size="sm"
             variant="ghost"
-            onClick={() => {
-              localStorage.removeItem(SESSION_KEY);
-              setSession(null);
-              setManage(false);
-              setError("");
-            }}
+            className="px-2 text-xs sm:px-3 sm:text-sm"
+            onClick={signOut}
           >
             <LogOut />
-            ထွက်ရန်
+            {admin ? "ထွက်ရန်" : "အလုပ်ဆင်းရန်"}
           </Button>
         </div>
       </div>
       {admin && manage && access ? (
-        <AdminTools access={access} save={saveAccess} />
+        <AdminTools access={access} profileId={session.id} save={saveAccess} />
       ) : admin ? (
         children
       ) : (
@@ -216,12 +300,23 @@ function Field({
     </label>
   );
 }
-function AdminTools({ access, save }: { access: AccessData; save: (v: AccessData) => void }) {
+function AdminTools({
+  access,
+  profileId,
+  save,
+}: {
+  access: AccessData;
+  profileId: string;
+  save: (v: AccessData) => void;
+}) {
   const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [attendance] = useTable("attendance", []);
   const [appearance, setAppearance] = useState<AppSettings>(loadAppSettings);
   async function add() {
     setBusy(true);
@@ -293,6 +388,26 @@ function AdminTools({ access, save }: { access: AccessData; save: (v: AccessData
       window.location.reload();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Backup ပြန်ထည့်မရပါ။");
+    }
+  }
+  async function applyReset(passwordValue: string) {
+    await resetBusinessData(access, profileId, passwordValue);
+    setResetPassword("");
+    setResetMessage("စာရင်းဒေတာအားလုံး ဖျက်ပြီးပါပြီ။ Admin အကောင့်နှင့် အပြင်အဆင်ကို ဆက်လက်ထိန်းသိမ်းထားပါသည်။");
+    window.dispatchEvent(new Event("biz:changed"));
+  }
+  async function resetData(event: React.FormEvent) {
+    event.preventDefault();
+    setResetMessage("");
+    setBusy(true);
+    try {
+      if (!window.confirm("စာရင်းအားလုံးကို အပြီးဖျက်ပါမည်။ Backup အရင်ထုတ်ထားပါသလား?")) return;
+      if (!window.confirm("ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်မရပါ။ ဆက်ဖျက်မလား?")) return;
+      await applyReset(resetPassword);
+    } catch (error) {
+      setResetMessage(error instanceof Error ? error.message : "စာရင်းဖျက်မရပါ။");
+    } finally {
+      setBusy(false);
     }
   }
   return (
@@ -455,6 +570,27 @@ function AdminTools({ access, save }: { access: AccessData; save: (v: AccessData
           <Button disabled={busy}>ဝန်ထမ်းထည့်ရန်</Button>
         </form>
       </section>
+      <section className="space-y-3 border-t pt-6">
+        <h2 className="text-xl font-bold">ဝန်ထမ်းအလုပ်ဆင်းချိန်မှတ်တမ်း</h2>
+        {attendance.length ? (
+          <div className="divide-y border-y">
+            {[...attendance]
+              .sort((a, b) =>
+                `${b["date"]} ${b["time"]}`.localeCompare(`${a["date"]} ${a["time"]}`),
+              )
+              .map((record) => (
+                <div key={record.id} className="flex flex-wrap justify-between gap-2 py-3">
+                  <span>{record["staffName"]}</span>
+                  <time className="text-sm text-muted-foreground">
+                    {record["date"]} · {record["time"]}
+                  </time>
+                </div>
+              ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">မှတ်တမ်းမရှိသေးပါ။</p>
+        )}
+      </section>
       <section className="space-y-4 border-t pt-6">
         <h2 className="text-xl font-bold">စာရင်း Backup</h2>
         <p className="text-sm text-muted-foreground">
@@ -481,6 +617,39 @@ function AdminTools({ access, save }: { access: AccessData; save: (v: AccessData
             </label>
           </Button>
         </div>
+      </section>
+      <section className="space-y-4 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 sm:p-5">
+        <div>
+          <h2 className="text-xl font-bold text-destructive">စာရင်းအားလုံး Reset လုပ်ရန်</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            ရောင်းအား၊ ကုန်ကျစရိတ်၊ ကုန်ပစ္စည်း၊ ကုန်သည်နှင့် ဖောက်သည်စာရင်းအားလုံးကို ဖျက်မည်။ Admin/ဝန်ထမ်းအကောင့်၊ စကားဝှက်နှင့်
+            App အပြင်အဆင်များကို မဖျက်ပါ။
+          </p>
+        </div>
+        <form
+          onSubmit={(event) => void resetData(event)}
+          className="grid gap-3 sm:grid-cols-[1fr_auto]"
+        >
+          <label className="space-y-2 text-sm font-medium">
+            <span className="block">Admin စကားဝှက် အတည်ပြုပါ</span>
+            <input
+              required
+              type="password"
+              autoComplete="current-password"
+              value={resetPassword}
+              onChange={(event) => setResetPassword(event.target.value)}
+              className="w-full rounded-md border bg-background px-3 py-2"
+            />
+          </label>
+          <Button type="submit" variant="destructive" className="self-end" disabled={busy}>
+            <RotateCcw className="size-4" /> စာရင်းအားလုံး ဖျက်ရန်
+          </Button>
+        </form>
+        {resetMessage && (
+          <p role="status" className="text-sm font-medium text-destructive">
+            {resetMessage}
+          </p>
+        )}
       </section>
       {message && (
         <p role="status" className="text-sm text-primary">
@@ -509,7 +678,7 @@ function StaffPanel({ profile }: { profile: Profile }) {
   }, [customer]);
   function rememberVoiceCursor() {
     const active = document.activeElement;
-    if (active instanceof HTMLInputElement && active.dataset.voiceCursor === "customer") {
+    if (active instanceof HTMLInputElement && active.dataset["voiceCursor"] === "customer") {
       voiceCursor.current = {
         start: active.selectionStart ?? active.value.length,
         end: active.selectionEnd ?? active.value.length,
@@ -577,8 +746,8 @@ function StaffPanel({ profile }: { profile: Profile }) {
     }
   }
   return (
-    <div className="min-h-[calc(100vh-57px)] pl-[190px]">
-      <aside className="fixed bottom-0 left-0 top-[57px] z-20 flex w-[190px] flex-col border-r border-border/70 bg-card px-3 py-5">
+    <div className="min-h-[calc(100vh-57px)] md:pl-[190px]">
+      <aside className="fixed bottom-0 left-0 top-[57px] z-20 hidden w-[190px] flex-col border-r border-border/70 bg-card px-3 py-5 md:flex">
         <p className="mb-4 px-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
           ဝန်ထမ်း စာမျက်နှာ
         </p>
@@ -604,7 +773,32 @@ function StaffPanel({ profile }: { profile: Profile }) {
           ))}
         </nav>
       </aside>
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+      <main className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
+        <nav
+          aria-label="ဝန်ထမ်း စာမျက်နှာများ"
+          className="app-scrollbar -mx-3 mb-4 flex gap-2 overflow-x-auto px-3 pb-2 md:hidden"
+        >
+          {(
+            [
+              ["sales", "အရောင်းထည့်ရန်"],
+              ["products", "ပစ္စည်းရောင်းဈေး"],
+              ["stock", "ပစ္စည်းလက်ကျန်"],
+            ] as const
+          ).map(([key, label]) => (
+            <Button
+              key={key}
+              size="sm"
+              variant={tab === key ? "default" : "outline"}
+              className="min-h-10 shrink-0"
+              onClick={() => {
+                setTab(key);
+                setMessage("");
+              }}
+            >
+              {label}
+            </Button>
+          ))}
+        </nav>
         {tab === "sales" && (
           <form
             onSubmit={(e) => {

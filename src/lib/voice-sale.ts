@@ -27,14 +27,15 @@ function editDistance(left: string[], right: string[]): number {
     const current = [row];
     for (let column = 1; column <= right.length; column++) {
       current[column] = Math.min(
-        current[column - 1] + 1,
-        previous[column] + 1,
-        previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1),
+        (current[column - 1] ?? Number.POSITIVE_INFINITY) + 1,
+        (previous[column] ?? Number.POSITIVE_INFINITY) + 1,
+        (previous[column - 1] ?? Number.POSITIVE_INFINITY) +
+          ((left[row - 1] ?? "") === (right[column - 1] ?? "") ? 0 : 1),
       );
     }
     previous = current;
   }
-  return previous[right.length];
+  return previous[right.length] ?? Number.POSITIVE_INFINITY;
 }
 
 function findProduct(transcript: string, products: Row[]): Row | undefined {
@@ -49,11 +50,13 @@ function findProduct(transcript: string, products: Row[]): Row | undefined {
         .filter(({ term }) => term && normalizedTranscript.includes(term));
     })
     .sort((a, b) => b.term.length - a.term.length);
-  if (exactMatches.length) {
-    const bestLength = exactMatches[0].term.length;
+  const firstExactMatch = exactMatches[0];
+  if (firstExactMatch) {
+    const bestLength = firstExactMatch.term.length;
     const bestMatches = exactMatches.filter((match) => match.term.length === bestLength);
-    return new Set(bestMatches.map((match) => match.product.id)).size === 1
-      ? bestMatches[0].product
+    const bestMatch = bestMatches[0];
+    return bestMatch && new Set(bestMatches.map((match) => match.product.id)).size === 1
+      ? bestMatch.product
       : undefined;
   }
 
@@ -117,18 +120,20 @@ export function parseVoiceCustomer(transcript: string, customers: Row[] = []): s
         .filter(({ term }) => term && normalizedTranscript.includes(term));
     })
     .sort((a, b) => b.term.length - a.term.length);
-  if (matchingCustomer.length) {
-    const bestLength = matchingCustomer[0].term.length;
+  const firstCustomerMatch = matchingCustomer[0];
+  if (firstCustomerMatch) {
+    const bestLength = firstCustomerMatch.term.length;
     const bestMatches = matchingCustomer.filter((match) => match.term.length === bestLength);
-    if (new Set(bestMatches.map((match) => match.customer.id)).size === 1) {
-      return String(bestMatches[0].customer["name"] ?? "");
+    const bestMatch = bestMatches[0];
+    if (bestMatch && new Set(bestMatches.map((match) => match.customer.id)).size === 1) {
+      return String(bestMatch.customer["name"] ?? "");
     }
   }
 
   const customerMatch = transcript
     .normalize("NFC")
     .match(/(?:ဖောက်သည်|ဝယ်သူ)\s*([^\d၊၊။]+?)(?:\s+(?:ဝယ်|ယူ|မှာ|ပေး|ထည့်))/);
-  return customerMatch ? customerMatch[1].replace(/(?:က|ကို)\s*$/, "").trim() : "";
+  return customerMatch?.[1]?.replace(/(?:က|ကို)\s*$/, "").trim() ?? "";
 }
 
 export function parseVoiceQuantity(transcript: string): number | null {
@@ -153,6 +158,10 @@ export function parseVoiceQuantity(transcript: string): number | null {
   const spokenNumber = Object.keys(spokenNumbers).find((word) =>
     new RegExp(`${word}\\s*(?:ခု|ပွဲ|ယာ|အုပ်|ခွက်)?`).test(normalized),
   );
-  const qty = digitMatch ? Number(digitMatch[1]) : spokenNumber ? spokenNumbers[spokenNumber] : 1;
-  return Number.isFinite(qty) && qty > 0 ? qty : null;
+  const qty = digitMatch
+    ? Number(digitMatch[1] ?? Number.NaN)
+    : spokenNumber
+      ? (spokenNumbers[spokenNumber] ?? null)
+      : 1;
+  return typeof qty === "number" && Number.isFinite(qty) && qty > 0 ? qty : null;
 }

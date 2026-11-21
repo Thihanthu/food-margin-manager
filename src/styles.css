@@ -173,6 +173,10 @@
   input,
   select,
   textarea {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+    touch-action: manipulation;
     transition:
       border-color 150ms ease,
       box-shadow 150ms ease,

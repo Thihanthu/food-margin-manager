@@ -37,7 +37,7 @@ function encodeWav(buffer: AudioBuffer): Blob {
       source.length - 1,
       Math.round((index * buffer.sampleRate) / targetRate),
     );
-    const sample = Math.max(-1, Math.min(1, source[sourceIndex]));
+    const sample = Math.max(-1, Math.min(1, source[sourceIndex] ?? 0));
     view.setInt16(44 + index * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
   }
   return new Blob([output], { type: "audio/wav" });

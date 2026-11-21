@@ -22,6 +22,7 @@ export const TABLE_KEYS = [
   "suppliers",
   "customers",
   "supplierLedger",
+  "attendance",
 ] as const;
 export const STAFF_FIELDS: Record<string, string[]> = {
   products: ["id", "name", "price", "voiceAliases"],
@@ -48,6 +49,76 @@ export async function passwordHash(password: string, salt: string) {
   );
   return Array.from(new Uint8Array(bits), (v) => v.toString(16).padStart(2, "0")).join("");
 }
+export async function verifyAdminPassword(
+  access: AccessData,
+  profileId: string,
+  password: string,
+): Promise<boolean> {
+  const profile = access.profiles.find((item) => item.id === profileId);
+  if (!profile || access.roles[profileId] !== "admin" || !password) return false;
+  return (await passwordHash(password, profile.salt)) === profile.hash;
+}
+export function localDateTime(now = new Date()) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return {
+    date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+  };
+}
+export function recordShiftEnd(
+  profile: Pick<Profile, "id" | "name">,
+  storage: Pick<Storage, "getItem" | "setItem"> = localStorage,
+  now = new Date(),
+) {
+  const key = "biz:attendance";
+  const raw = storage.getItem(key);
+  let records: Record<string, string | number>[] = [];
+  if (raw) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (
+        !Array.isArray(parsed) ||
+        parsed.some(
+          (row) =>
+            !row || typeof row !== "object" || typeof (row as { id?: unknown }).id !== "string",
+        )
+      )
+        throw new Error();
+      records = parsed;
+    } catch {
+      throw new Error("အလုပ်ဆင်းမှတ်တမ်းဖတ်မရပါ။");
+    }
+  }
+  const { date, time } = localDateTime(now);
+  const record = {
+    id: crypto.randomUUID(),
+    staffId: profile.id,
+    staffName: profile.name,
+    date,
+    time,
+  };
+  storage.setItem(key, JSON.stringify([...records, record]));
+  return record;
+}
+export async function resetBusinessData(
+  access: AccessData,
+  profileId: string,
+  password: string,
+  storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> = localStorage,
+) {
+  if (!(await verifyAdminPassword(access, profileId, password)))
+    throw new Error("Admin စကားဝှက် မှားနေပါသည်။");
+  const previous = TABLE_KEYS.map((key) => [key, storage.getItem(`biz:${key}`)] as const);
+  try {
+    for (const key of TABLE_KEYS) storage.setItem(`biz:${key}`, "[]");
+  } catch (error) {
+    for (const [key, value] of previous) {
+      if (value === null) storage.removeItem(`biz:${key}`);
+      else storage.setItem(`biz:${key}`, value);
+    }
+    throw error;
+  }
+}
 export async function makeProfile(
   username: string,
   name: string,
@@ -73,7 +144,7 @@ export function parseBackup(text: string) {
     throw new Error("Backup မမှန်ပါ");
   const tables = { ...value.tables };
   for (const key of TABLE_KEYS) {
-    const rows = tables[key] ?? (key === "supplierLedger" ? [] : null);
+    const rows = tables[key] ?? (["supplierLedger", "attendance"].includes(key) ? [] : null);
     if (
       !Array.isArray(rows) ||
       rows.some(

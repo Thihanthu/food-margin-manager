@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ks, uid, type Row } from "@/lib/store";
+import { localDateTime } from "@/lib/offline-access";
 import { VoiceSaleEntry } from "@/components/VoiceSaleEntry";
 
 export function SalesPanel({
@@ -31,7 +32,7 @@ export function SalesPanel({
   }, [draftCustomer]);
   function rememberVoiceCursor() {
     const active = document.activeElement;
-    if (active instanceof HTMLInputElement && active.dataset.voiceCursor === "customer") {
+    if (active instanceof HTMLInputElement && active.dataset["voiceCursor"] === "customer") {
       voiceCursor.current = {
         start: active.selectionStart ?? active.value.length,
         end: active.selectionEnd ?? active.value.length,
@@ -62,8 +63,8 @@ export function SalesPanel({
             .toLocaleLowerCase() === customerName.toLocaleLowerCase(),
       );
       const savedDraft: Row = { ...draft, customer: customerName };
-      if (customer) savedDraft.customerId = customer.id;
-      else delete savedDraft.customerId;
+      if (customer) savedDraft["customerId"] = customer.id;
+      else delete savedDraft["customerId"];
       save(
         rows.some((row) => row.id === savedDraft.id)
           ? rows.map((row) => (row.id === savedDraft.id ? savedDraft : row))
@@ -81,9 +82,11 @@ export function SalesPanel({
         <h2 className="text-xl font-bold">နေ့စဉ်အရောင်း</h2>
         <Button
           onClick={() => {
+            const timestamp = localDateTime();
             setDraft({
               id: uid(),
-              date: new Date().toISOString().slice(0, 10),
+              date: timestamp.date,
+              time: timestamp.time,
               customer: "",
               product: "",
               qty: 1,
@@ -103,9 +106,11 @@ export function SalesPanel({
         onInsertText={insertVoiceText}
         onApply={({ productId, qty, customer }) => {
           const product = products.find((row) => row.id === productId);
+          const timestamp = localDateTime();
           setDraft((current) => ({
             id: current?.id ?? uid(),
-            date: current?.date ?? new Date().toISOString().slice(0, 10),
+            date: current?.["date"] ?? timestamp.date,
+            time: current?.["time"] ?? timestamp.time,
             customer: customer || current?.["customer"] || "",
             product: product?.["name"] ?? current?.["product"] ?? "",
             qty,
@@ -141,6 +146,7 @@ export function SalesPanel({
           {(
             [
               ["date", "ရက်စွဲ", "date"],
+              ["time", "လာဝယ်ချိန်", "time"],
               ["customer", "ဖောက်သည်အမည်", "text"],
               ["qty", "အရေအတွက်", "number"],
               ["price", "ရောင်းဈေး", "number"],
@@ -150,7 +156,7 @@ export function SalesPanel({
               <span className="block">{label}</span>
               <input
                 ref={key === "customer" ? customerInput : undefined}
-                required={key !== "customer"}
+                required={key !== "customer" && key !== "time"}
                 type={type}
                 step={type === "number" ? "any" : undefined}
                 min={key === "qty" ? "0.000000001" : key === "price" ? "0" : undefined}
@@ -196,7 +202,9 @@ export function SalesPanel({
                 <h3 className="break-words font-semibold">
                   {row["customer"] || "အမည်မပါ"} · {row["product"]}
                 </h3>
-                <p className="text-sm text-muted-foreground">{row["date"]}</p>
+                <p className="text-sm text-muted-foreground">
+                  {row["date"]} {row["time"] ? `· ${row["time"]}` : ""}
+                </p>
               </div>
               <div className="flex shrink-0">
                 <Button
@@ -205,7 +213,11 @@ export function SalesPanel({
                   aria-label="အရောင်းပြင်ရန်"
                   title="အရောင်းပြင်ရန်"
                   onClick={() => {
-                    setDraft({ ...row, customer: row["customer"] ?? "" });
+                    setDraft({
+                      ...row,
+                      customer: row["customer"] ?? "",
+                      time: row["time"] ?? "",
+                    });
                     setError("");
                   }}
                 >

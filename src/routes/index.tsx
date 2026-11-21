@@ -196,8 +196,8 @@ function Index() {
   ];
 
   return (
-    <div className="min-h-screen pl-[220px]">
-      <aside className="fixed bottom-0 left-0 top-[57px] z-30 flex w-[220px] flex-col border-r border-border/70 bg-card/95 px-3 pb-4 pt-5 shadow-lg shadow-primary/5">
+    <div className="min-h-screen md:pl-[220px]">
+      <aside className="fixed bottom-0 left-0 top-[57px] z-30 hidden w-[220px] flex-col border-r border-border/70 bg-card/95 px-3 pb-4 pt-5 shadow-lg shadow-primary/5 md:flex">
         <div className="mb-5 flex items-center gap-3 px-2">
           {appSettings.logo ? (
             <img
@@ -220,7 +220,7 @@ function Index() {
           className="app-scrollbar flex-1 space-y-1 overflow-y-auto pr-1"
         >
           {TABS.map((t, i) => {
-            const Icon = tabIcons[i];
+            const Icon = tabIcons[i] ?? BarChart3;
             return (
               <button
                 key={t}
@@ -240,7 +240,27 @@ function Index() {
         </div>
       </aside>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-8">
+        <nav
+          aria-label="စာရင်းအမျိုးအစားများ"
+          className="app-scrollbar -mx-3 mb-4 flex gap-2 overflow-x-auto px-3 pb-2 md:hidden"
+        >
+          {TABS.map((label, index) => {
+            const Icon = tabIcons[index] ?? BarChart3;
+            return (
+              <button
+                key={label}
+                type="button"
+                aria-current={tab === index ? "page" : undefined}
+                onClick={() => setTab(index)}
+                className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-medium ${tab === index ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground"}`}
+              >
+                <Icon className="size-4" />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
         {tab === 0 && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {(

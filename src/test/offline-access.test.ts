@@ -3,6 +3,9 @@ import {
   staffProjection,
   parseBackup,
   restoreSession,
+  passwordHash,
+  resetBusinessData,
+  recordShiftEnd,
   TABLE_KEYS,
   type AccessData,
 } from "@/lib/offline-access";
@@ -62,6 +65,86 @@ describe("Offline session", () => {
     ).toBeNull();
   });
 });
+describe("Admin data reset", () => {
+  it("clears every business table only after the current admin password is verified", async () => {
+    const owner = {
+      id: "owner",
+      username: "owner",
+      name: "Owner",
+      salt: "test-salt",
+      hash: await passwordHash("correct-password", "test-salt"),
+    };
+    const access: AccessData = { profiles: [owner], roles: { owner: "admin" } };
+    const values = new Map(TABLE_KEYS.map((key) => [`biz:${key}`, '[{"id":"existing"}]']));
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    };
+
+    await expect(resetBusinessData(access, "owner", "wrong-password", storage)).rejects.toThrow(
+      "Admin စကားဝှက် မှားနေပါသည်။",
+    );
+    expect(values.get("biz:sales")).toBe('[{"id":"existing"}]');
+
+    await resetBusinessData(access, "owner", "correct-password", storage);
+    for (const key of TABLE_KEYS) expect(values.get(`biz:${key}`)).toBe("[]");
+  });
+
+  it("does not allow a staff account to reset the business tables", async () => {
+    const staff = {
+      id: "staff",
+      username: "staff",
+      name: "Staff",
+      salt: "test-salt",
+      hash: await passwordHash("correct-password", "test-salt"),
+    };
+    const access: AccessData = { profiles: [staff], roles: { staff: "user" } };
+    const values = new Map([["biz:sales", '[{"id":"existing"}]']]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    };
+
+    await expect(resetBusinessData(access, "staff", "correct-password", storage)).rejects.toThrow(
+      "Admin စကားဝှက် မှားနေပါသည်။",
+    );
+    expect(values.get("biz:sales")).toBe('[{"id":"existing"}]');
+  });
+});
+describe("Staff shift end", () => {
+  it("records the staff member and local shift-end date and time", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+    const profile = { id: "staff-1", name: "Staff" };
+
+    const record = recordShiftEnd(profile, storage, new Date(2026, 10, 21, 14, 5));
+
+    expect(record).toMatchObject({
+      staffId: "staff-1",
+      staffName: "Staff",
+      date: "2026-11-21",
+      time: "14:05",
+    });
+    expect(JSON.parse(values.get("biz:attendance") ?? "[]")).toEqual([record]);
+  });
+  it("does not overwrite a corrupted attendance table", () => {
+    const original = "{bad json";
+    const values = new Map([["biz:attendance", original]]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+    expect(() => recordShiftEnd({ id: "staff-1", name: "Staff" }, storage)).toThrow(
+      "အလုပ်ဆင်းမှတ်တမ်းဖတ်မရပါ။",
+    );
+    expect(values.get("biz:attendance")).toBe(original);
+  });
+});
 describe("Backup", () => {
   it("preserves customer names on sales and accepts older unnamed sales", () => {
     const tables: Record<string, Record<string, string | number>[]> = Object.fromEntries(
@@ -81,15 +164,16 @@ describe("Backup", () => {
       tables,
     );
   });
-  it("accepts older backups without the supplier ledger", () => {
+  it("accepts older backups without the supplier ledger or attendance table", () => {
     const tables = Object.fromEntries(
-      TABLE_KEYS.filter((key) => key !== "supplierLedger").map((key) => [key, []]),
+      TABLE_KEYS.filter((key) => key !== "supplierLedger" && key !== "attendance").map((key) => [
+        key,
+        [],
+      ]),
     );
-    expect(
-      parseBackup(JSON.stringify({ app: "food-margin-manager", version: 1, tables }))[
-        "supplierLedger"
-      ],
-    ).toEqual([]);
+    const parsed = parseBackup(JSON.stringify({ app: "food-margin-manager", version: 1, tables }));
+    expect(parsed["supplierLedger"]).toEqual([]);
+    expect(parsed["attendance"]).toEqual([]);
   });
   it("rejects malformed tables before restore", () => {
     expect(() =>
