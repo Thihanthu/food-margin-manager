@@ -3,17 +3,20 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ks, uid, type Row } from "@/lib/store";
 import { localDateTime } from "@/lib/offline-access";
+import { recipeStatus } from "@/lib/recipes";
 import { VoiceSaleEntry } from "@/components/VoiceSaleEntry";
 
 export function SalesPanel({
   rows,
   products,
+  stock,
   customers,
   save,
   profit,
 }: {
   rows: Row[];
   products: Row[];
+  stock: Row[];
   customers: Row[];
   save: (rows: Row[]) => void;
   profit: (row: Row) => number;
@@ -27,6 +30,8 @@ export function SalesPanel({
     `${b["date"]} ${b["time"] ?? ""}`.localeCompare(`${a["date"]} ${a["time"] ?? ""}`),
   );
   const draftCustomer = draft?.["customer"];
+  const selectedProduct = products.find((row) => row.id === draft?.["productId"]);
+  const selectedRecipeStatus = selectedProduct ? recipeStatus(selectedProduct, stock) : "";
   useEffect(() => {
     if (pendingCaret.current === null || !customerInput.current) return;
     customerInput.current.focus();
@@ -91,6 +96,7 @@ export function SalesPanel({
               date: timestamp.date,
               time: timestamp.time,
               customer: "",
+              productId: "",
               product: "",
               qty: 1,
               price: 0,
@@ -115,6 +121,7 @@ export function SalesPanel({
             date: current?.["date"] ?? timestamp.date,
             time: current?.["time"] ?? timestamp.time,
             customer: customer || current?.["customer"] || "",
+            productId,
             product: product?.["name"] ?? current?.["product"] ?? "",
             qty,
             price: product?.["price"] ?? current?.["price"] ?? 0,
@@ -128,24 +135,37 @@ export function SalesPanel({
             <select
               aria-label="ပစ္စည်းအမည်"
               required
-              value={String(draft["product"])}
-              onChange={(e) =>
+              value={String(
+                draft["productId"] ??
+                  products.find((row) => row["name"] === draft["product"])?.id ??
+                  "",
+              )}
+              onChange={(e) => {
+                const product = products.find((row) => row.id === e.target.value);
                 setDraft({
                   ...draft,
-                  product: e.target.value,
-                  price: products.find((row) => row["name"] === e.target.value)?.["price"] ?? 0,
-                })
-              }
+                  productId: e.target.value,
+                  product: String(product?.["name"] ?? ""),
+                  price: product?.["price"] ?? 0,
+                });
+              }}
               className="w-full rounded-md border bg-background p-3"
             >
               <option value="">ရွေးပါ</option>
               {products.map((row) => (
-                <option key={row.id} value={row["name"]}>
-                  {row["name"]}
+                <option key={row.id} value={row.id}>
+                  {row["name"]} — {recipeStatus(row, stock)}
                 </option>
               ))}
             </select>
           </label>
+          {selectedProduct && selectedRecipeStatus !== "ကုန်ကြမ်းမသုံး" && (
+            <p className="text-sm text-amber-700 sm:col-span-2">
+              {selectedRecipeStatus === "ကုန်ကြမ်းမချိတ်ရသေး"
+                ? `${selectedProduct["name"]} အတွက် ကုန်ကြမ်းမချိတ်ရသေးပါ။ အရောင်းတွင် ကုန်ကြမ်းလက်ကျန် မလျော့ပါ။ “ကုန်ကြမ်းသုံးနှုန်း” စာမျက်နှာတွင် ချိတ်ပါ။`
+                : `${selectedProduct["name"]} ၏ ကုန်ကြမ်းချိတ်ဆက်မှု စစ်ရန်လိုပါသည်။ ${selectedRecipeStatus}`}
+            </p>
+          )}
           {(
             [
               ["date", "ရက်စွဲ", "date"],
@@ -219,6 +239,10 @@ export function SalesPanel({
                     setDraft({
                       ...row,
                       customer: row["customer"] ?? "",
+                      productId:
+                        row["productId"] ??
+                        products.find((product) => product["name"] === row["product"])?.id ??
+                        "",
                       time: row["time"] ?? "",
                     });
                     setError("");

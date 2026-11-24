@@ -9,7 +9,7 @@ import { ExpenseSummaryPanel } from "@/components/ExpenseSummaryPanel";
 import { RecipePanel } from "@/components/RecipePanel";
 import { SalesPanel } from "@/components/SalesPanel";
 import { SupplierPanel } from "@/components/SupplierPanel";
-import { recipeCost, saleProfit, saveSales, stockWithdrawals } from "@/lib/recipes";
+import { recipeCost, recipeStatus, saleProfit, saveSales, stockWithdrawals } from "@/lib/recipes";
 import { localDateTime } from "@/lib/offline-access";
 import {
   BarChart3,
@@ -315,6 +315,7 @@ function Index() {
                 { key: "voiceAliases", label: "အသံဖမ်းမှားလေ့ရှိသော အမည်များ (၊ ဖြင့်ခွဲ)" },
                 { key: "price", label: "ရောင်းဈေး", type: "number" },
                 { key: "cost", label: "အရင်း (ကိုယ်တိုင်ဖြည့်)", type: "number" },
+                { key: "recipeStatus", label: "ကုန်ကြမ်းချိတ်ဆက်မှု", calc: (r) => recipeStatus(r, stock) },
                 {
                   key: "recipeCost",
                   label: "တွက်ချက်ထားသောအရင်း",
@@ -385,6 +386,7 @@ function Index() {
           <SalesPanel
             rows={sales}
             products={products}
+            stock={stock}
             customers={customers}
             save={saveSales}
             profit={saleP}

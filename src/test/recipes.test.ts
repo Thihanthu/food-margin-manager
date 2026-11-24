@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   recipeCost,
+  recipeStatus,
   reconcileSales,
   saleProfit,
   saleTotal,
   saveSales,
   stockWithdrawals,
+  productForSale,
 } from "@/lib/recipes";
 import { parseBackup, staffProjection, TABLE_KEYS } from "@/lib/offline-access";
 import type { Row } from "@/lib/store";
@@ -42,6 +44,32 @@ describe("Per-serving recipes", () => {
   });
   it("accepts 0.25 and 0.5 quantities and calculates 125 per serving", () => {
     expect(recipeCost(products[0], stock)).toBe(125);
+  });
+  it("reports whether a sale product is linked to valid stock ingredients", () => {
+    expect(recipeStatus(products[0], stock)).toBe("ကုန်ကြမ်း 2 မျိုးချိတ်ထားသည်");
+    expect(recipeStatus({ id: "plain", name: "Plain" }, stock)).toBe("ကုန်ကြမ်းမချိတ်ရသေး");
+    expect(
+      recipeStatus(
+        { id: "missing", name: "Missing", recipe: '[{"stockId":"gone","qty":1}]' },
+        stock,
+      ),
+    ).toBe("ကုန်ကြမ်းစာရင်းမရှိ");
+  });
+  it("uses product IDs to link duplicate-named sale products to the right recipe", () => {
+    const other: Row = {
+      id: "meal-other",
+      name: "Meal",
+      recipe: JSON.stringify([{ stockId: "oil", qty: 1 }]),
+    };
+    const result = reconcileSales(
+      [],
+      [{ ...sale, productId: other.id }],
+      [...products, other],
+      stock,
+    );
+    expect(first(result.sales)["productId"]).toBe(other.id);
+    expect(result.stock.map((row) => row["qty"])).toEqual([10, 3]);
+    expect(productForSale(sale, [...products, other])).toBeUndefined();
   });
   it("deducts each ingredient per serving sold", () => {
     const r = reconcileSales([], [sale], products, stock);
@@ -99,7 +127,7 @@ describe("Per-serving recipes", () => {
     };
     const edit = reconcileSales(
       r.sales,
-      [{ ...first(r.sales), product: "Tea" }],
+      [{ ...first(r.sales), productId: other.id, product: "Tea" }],
       [...products, other],
       r.stock,
     );

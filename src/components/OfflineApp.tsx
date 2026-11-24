@@ -16,6 +16,7 @@ import {
   SESSION_KEY,
   TABLE_KEYS,
   makeProfile,
+  localDateTime,
   passwordHash,
   parseBackup,
   resetBusinessData,
@@ -730,8 +731,9 @@ function StaffPanel({ profile }: { profile: Profile }) {
       const rows = JSON.parse(localStorage.getItem("biz:sales") ?? "[]");
       rows.push({
         id: crypto.randomUUID(),
-        date: new Date().toISOString().slice(0, 10),
+        ...localDateTime(),
         customer: customer.trim(),
+        productId: p.id,
         product: p["name"],
         qty: count,
         price: p["price"],

@@ -17,6 +17,19 @@ export function ingredients(product?: Row): Ingredient[] {
   if (!product?.["recipe"]) return [];
   return parseIngredients(String(product["recipe"]));
 }
+export function productForSale(sale: Row, products: Row[]) {
+  const productId = String(sale["productId"] ?? "");
+  if (productId) return products.find((product) => product.id === productId);
+  const matches = products.filter((product) => product["name"] === sale["product"]);
+  return matches.length === 1 ? matches[0] : undefined;
+}
+export function recipeStatus(product: Row, stock: Row[]) {
+  if (!product["recipe"]) return "ကုန်ကြမ်းမချိတ်ရသေး";
+  const recipe = ingredients(product);
+  if (recipe.length === 0) return "ကုန်ကြမ်းမသုံး";
+  if (recipe.some((item) => !stock.some((row) => row.id === item.stockId))) return "ကုန်ကြမ်းစာရင်းမရှိ";
+  return `ကုန်ကြမ်း ${recipe.length} မျိုးချိတ်ထားသည်`;
+}
 const round = (n: number) => Math.round(n * 1e9) / 1e9;
 export function saleTotal(quantity: unknown, price: unknown): number | null {
   const count = typeof quantity === "string" && !quantity.trim() ? Number.NaN : Number(quantity);
@@ -67,7 +80,10 @@ export function reconcileSales(previous: Row[], next: Row[], products: Row[], st
   const old = new Map(previous.map((row) => [row.id, row]));
   const current = new Map(next.map((row) => [row.id, row]));
   const changed = (a: Row, b?: Row) =>
-    !b || a["product"] !== b["product"] || Number(a["qty"]) !== Number(b["qty"]);
+    !b ||
+    a["product"] !== b["product"] ||
+    a["productId"] !== b["productId"] ||
+    Number(a["qty"]) !== Number(b["qty"]);
   for (const row of previous)
     if (changed(row, current.get(row.id))) {
       for (const item of usage(row)) {
@@ -86,10 +102,10 @@ export function reconcileSales(previous: Row[], next: Row[], products: Row[], st
         ...("usage" in before ? { usage: before["usage"] } : {}),
         ...("unitCost" in before ? { unitCost: before["unitCost"] } : {}),
       };
-    const product = products.find((p) => p["name"] === row["product"]);
+    const product = productForSale(row, products);
     const count = Number(row["qty"]);
     if (!product || !Number.isFinite(count) || count <= 0)
-      throw new Error("ပစ္စည်းနှင့် အရေအတွက် မှန်ကန်စွာ ရွေးပါ။");
+      throw new Error("ရောင်းမည့်ပစ္စည်းကို အတိအကျရွေးပြီး အရေအတွက်ကို မှန်ကန်စွာ ဖြည့်ပါ။");
     const used = ingredients(product).map((item) => ({ ...item, qty: round(item.qty * count) }));
     for (const item of used) {
       if (!balances.has(item.stockId) || !Number.isFinite(balances.get(item.stockId)))
@@ -98,7 +114,12 @@ export function reconcileSales(previous: Row[], next: Row[], products: Row[], st
       if (remaining < 0) throw new Error("ကုန်ကြမ်းလက်ကျန် မလုံလောက်ပါ။");
       balances.set(item.stockId, remaining);
     }
-    return { ...row, usage: JSON.stringify(used), unitCost: recipeCost(product, stock) };
+    return {
+      ...row,
+      productId: product.id,
+      usage: JSON.stringify(used),
+      unitCost: recipeCost(product, stock),
+    };
   });
   return {
     sales,
@@ -106,7 +127,7 @@ export function reconcileSales(previous: Row[], next: Row[], products: Row[], st
   };
 }
 export function saleProfit(row: Row, products: Row[], stock: Row[]) {
-  const product = products.find((p) => p["name"] === row["product"]);
+  const product = productForSale(row, products);
   const cost =
     typeof row["unitCost"] === "number"
       ? row["unitCost"]
