@@ -42,6 +42,26 @@ export function recipeCost(product: Row, stock: Row[]) {
 function usage(sale: Row): Ingredient[] {
   return sale["usage"] ? parseIngredients(String(sale["usage"])) : [];
 }
+export function stockWithdrawals(sales: Row[], stock: Row[]) {
+  const stockById = new Map(stock.map((row) => [row.id, row]));
+  return sales
+    .flatMap((sale) =>
+      usage(sale).map((item) => {
+        const stockItem = stockById.get(item.stockId);
+        return {
+          id: `${sale.id}:${item.stockId}`,
+          date: String(sale["date"] ?? ""),
+          time: String(sale["time"] ?? ""),
+          customer: String(sale["customer"] ?? ""),
+          product: String(sale["product"] ?? ""),
+          stockName: String(stockItem?.["name"] ?? item.stockId),
+          unit: String(stockItem?.["unit"] ?? ""),
+          qty: item.qty,
+        };
+      }),
+    )
+    .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+}
 export function reconcileSales(previous: Row[], next: Row[], products: Row[], stock: Row[]) {
   const balances = new Map(stock.map((row) => [row.id, Number(row["qty"])]));
   const old = new Map(previous.map((row) => [row.id, row]));

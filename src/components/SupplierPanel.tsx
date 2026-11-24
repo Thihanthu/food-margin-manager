@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { EditableTable } from "@/components/EditableTable";
 import { downloadCsv, type LedgerCsvRow } from "@/lib/ledger";
 import { ks, num, uid, type Row } from "@/lib/store";
+import { localDateTime } from "@/lib/offline-access";
 
 type SupplierDraft = {
   kind: "purchase" | "payment";
   date: string;
+  time: string;
   supplierId: string;
   item: string;
   unit: string;
@@ -20,7 +22,7 @@ type SupplierDraft = {
 
 const blankDraft = (): SupplierDraft => ({
   kind: "purchase",
-  date: new Date().toISOString().slice(0, 10),
+  ...localDateTime(),
   supplierId: "",
   item: "",
   unit: "",
@@ -48,7 +50,9 @@ export function SupplierPanel({
   const selectedSupplier = suppliers.find((supplier) => supplier.id === selectedSupplierId);
   const visibleEntries = entries
     .filter((entry) => !selectedSupplierId || entry["supplierId"] === selectedSupplierId)
-    .sort((a, b) => String(b["date"]).localeCompare(String(a["date"])));
+    .sort((a, b) =>
+      `${b["date"]} ${b["time"] ?? ""}`.localeCompare(`${a["date"]} ${a["time"] ?? ""}`),
+    );
   const balanceFor = (supplier: Row) =>
     num(supplier["owed"]) +
     entries.reduce((balance, entry) => {
@@ -95,6 +99,7 @@ export function SupplierPanel({
       {
         id: uid(),
         date: draft.date,
+        time: draft.time,
         supplierId: supplier.id,
         supplier: String(supplier["name"] ?? ""),
         kind: draft.kind,
@@ -119,6 +124,7 @@ export function SupplierPanel({
       )
       .map((supplier) => [
         "",
+        "",
         supplier["name"],
         "အစပေးရန်ကျန်ငွေ",
         "အဖွင့်လက်ကျန်",
@@ -134,6 +140,7 @@ export function SupplierPanel({
       ...openingBalances,
       ...rows.map((entry) => [
         entry["date"],
+        entry["time"],
         entry["supplier"],
         entry["kind"] === "purchase" ? "ဝယ်ယူမှု" : "ငွေပေးချေမှု",
         entry["item"],
@@ -150,6 +157,7 @@ export function SupplierPanel({
       filename,
       [
         "ရက်စွဲ",
+        "အချိန်",
         "ကုန်သည်",
         "အမျိုးအစား",
         "ပစ္စည်း",
@@ -225,6 +233,16 @@ export function SupplierPanel({
                 type="date"
                 value={draft.date}
                 onChange={(event) => setDraft({ ...draft, date: event.target.value })}
+                className="w-full rounded-md border bg-background p-3"
+              />
+            </label>
+            <label className="space-y-2 text-sm">
+              <span className="block">အချိန်</span>
+              <input
+                required
+                type="time"
+                value={draft.time}
+                onChange={(event) => setDraft({ ...draft, time: event.target.value })}
                 className="w-full rounded-md border bg-background p-3"
               />
             </label>
@@ -368,7 +386,7 @@ export function SupplierPanel({
               <thead className="bg-muted text-left text-muted-foreground">
                 <tr>
                   {[
-                    "ရက်စွဲ",
+                    "ရက်စွဲ / အချိန်",
                     "ကုန်သည်",
                     "အမျိုးအစား",
                     "ပစ္စည်း/မှတ်ချက်",
@@ -387,7 +405,9 @@ export function SupplierPanel({
               <tbody>
                 {visibleEntries.map((entry) => (
                   <tr key={entry.id} className="border-t">
-                    <td className="px-3 py-2">{entry["date"]}</td>
+                    <td className="px-3 py-2">
+                      {entry["date"]} {entry["time"] ? `· ${entry["time"]}` : ""}
+                    </td>
                     <td className="px-3 py-2">{entry["supplier"]}</td>
                     <td className="px-3 py-2">
                       {entry["kind"] === "purchase" ? "ဝယ်ယူမှု" : "ငွေပေးချေမှု"}

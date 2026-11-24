@@ -50,15 +50,18 @@ export function CustomerPanel({
       }
       return String(sale["customer"] ?? "").trim().length > 0;
     })
-    .sort((a, b) => String(b["date"]).localeCompare(String(a["date"])));
+    .sort((a, b) =>
+      `${b["date"]} ${b["time"] ?? ""}`.localeCompare(`${a["date"]} ${a["time"] ?? ""}`),
+    );
   const customerSalesTotal = customerSales.reduce((total, sale) => total + saleAmount(sale), 0);
 
   function exportCustomerSales() {
     downloadCsv(
       `customer-ledger-${selectedCustomer?.id ?? "all"}-${new Date().toISOString().slice(0, 10)}.csv`,
-      ["ရက်စွဲ", "ဖောက်သည်", "ပစ္စည်း", "အရေအတွက်", "တစ်ခုဈေး", "စုစုပေါင်း"],
+      ["ရက်စွဲ", "အချိန်", "ဖောက်သည်", "ပစ္စည်း", "အရေအတွက်", "တစ်ခုဈေး", "စုစုပေါင်း"],
       customerSales.map((sale) => [
         sale["date"],
+        sale["time"],
         sale["customer"],
         sale["product"],
         sale["qty"],
@@ -236,17 +239,20 @@ export function CustomerPanel({
             <table className="w-full min-w-[560px] text-sm">
               <thead className="bg-muted text-left text-muted-foreground">
                 <tr>
-                  {["ရက်စွဲ", "ဖောက်သည်", "ပစ္စည်း", "အရေအတွက်", "တစ်ခုဈေး", "စုစုပေါင်း"].map((heading) => (
-                    <th key={heading} className="px-3 py-2">
-                      {heading}
-                    </th>
-                  ))}
+                  {["ရက်စွဲ", "အချိန်", "ဖောက်သည်", "ပစ္စည်း", "အရေအတွက်", "တစ်ခုဈေး", "စုစုပေါင်း"].map(
+                    (heading) => (
+                      <th key={heading} className="px-3 py-2">
+                        {heading}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {customerSales.map((sale) => (
                   <tr key={sale.id} className="border-t">
                     <td className="px-3 py-2">{sale["date"]}</td>
+                    <td className="px-3 py-2">{sale["time"] || "—"}</td>
                     <td className="px-3 py-2">{sale["customer"]}</td>
                     <td className="px-3 py-2">{sale["product"]}</td>
                     <td className="px-3 py-2">{sale["qty"]}</td>

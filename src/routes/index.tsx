@@ -9,7 +9,8 @@ import { ExpenseSummaryPanel } from "@/components/ExpenseSummaryPanel";
 import { RecipePanel } from "@/components/RecipePanel";
 import { SalesPanel } from "@/components/SalesPanel";
 import { SupplierPanel } from "@/components/SupplierPanel";
-import { recipeCost, saleProfit, saveSales } from "@/lib/recipes";
+import { recipeCost, saleProfit, saveSales, stockWithdrawals } from "@/lib/recipes";
+import { localDateTime } from "@/lib/offline-access";
 import {
   BarChart3,
   Boxes,
@@ -52,7 +53,7 @@ function OfflineHome() {
   );
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateTime().date;
 const TABS = [
   "အနှစ်ချုပ်",
   "ပစ္စည်းဈေးနှုန်း",
@@ -138,6 +139,7 @@ function Index() {
     saleT,
   );
   const lowStock = stock.filter((r) => num(r["qty"]) <= num(r["min"]));
+  const withdrawals = stockWithdrawals(sales, stock);
   const fixedM = sum(staff, (r) => num(r["salary"])) + sum(taxes, (r) => num(r["amount"]));
   const months = Array.from(
     new Set([...sales, ...daily].map((r) => String(r["date"] ?? "").slice(0, 7)).filter(Boolean)),
@@ -389,24 +391,69 @@ function Index() {
           />
         )}
         {tab === 7 && (
-          <EditableTable
-            rows={stock}
-            setRows={setStock}
-            blank={{ name: "", unit: "", qty: 0, min: 0, supplier: "", unitCost: 0 }}
-            cols={[
-              { key: "name", label: "ပစ္စည်း" },
-              { key: "unit", label: "ယူနစ်" },
-              { key: "qty", label: "လက်ကျန်", type: "number" },
-              { key: "unitCost", label: "တစ်ယူနစ်ဈေး", type: "number" },
-              { key: "min", label: "အနည်းဆုံးထားရမည်", type: "number" },
-              { key: "supplier", label: "ကုန်သည်" },
-              {
-                key: "s",
-                label: "အခြေအနေ",
-                calc: (r) => (num(r["qty"]) <= num(r["min"]) ? "⚠ ပြန်ဝယ်ရန်" : "✓ လုံလောက်"),
-              },
-            ]}
-          />
+          <div className="space-y-8">
+            <EditableTable
+              rows={stock}
+              setRows={setStock}
+              blank={{ name: "", unit: "", qty: 0, min: 0, supplier: "", unitCost: 0 }}
+              cols={[
+                { key: "name", label: "ပစ္စည်း" },
+                { key: "unit", label: "ယူနစ်" },
+                { key: "qty", label: "လက်ကျန်", type: "number" },
+                { key: "unitCost", label: "တစ်ယူနစ်ဈေး", type: "number" },
+                { key: "min", label: "အနည်းဆုံးထားရမည်", type: "number" },
+                { key: "supplier", label: "ကုန်သည်" },
+                {
+                  key: "s",
+                  label: "အခြေအနေ",
+                  calc: (r) => (num(r["qty"]) <= num(r["min"]) ? "⚠ ပြန်ဝယ်ရန်" : "✓ လုံလောက်"),
+                },
+              ]}
+            />
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-xl font-bold">ကုန်ပစ္စည်းထုတ်ယူမှုမှတ်တမ်း</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  အရောင်းမှတ်တမ်း၏ ရက်စွဲ/အချိန်အတိုင်း ချက်နည်းတွင် သုံးထားသော ကုန်ကြမ်းကို ပြထားပါသည်။
+                </p>
+              </div>
+              {withdrawals.length === 0 ? (
+                <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  ကုန်ကြမ်းထုတ်ယူမှုမှတ်တမ်း မရှိသေးပါ။
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead className="bg-muted text-left text-muted-foreground">
+                      <tr>
+                        {["ရက်စွဲ", "အချိန်", "အရောင်းပစ္စည်း", "ဖောက်သည်", "ထုတ်ယူသောကုန်ကြမ်း", "အရေအတွက်"].map(
+                          (heading) => (
+                            <th key={heading} className="px-3 py-2">
+                              {heading}
+                            </th>
+                          ),
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {withdrawals.map((movement) => (
+                        <tr key={movement.id} className="border-t">
+                          <td className="px-3 py-2">{movement.date || "—"}</td>
+                          <td className="px-3 py-2">{movement.time || "—"}</td>
+                          <td className="px-3 py-2">{movement.product || "—"}</td>
+                          <td className="px-3 py-2">{movement.customer || "—"}</td>
+                          <td className="px-3 py-2">{movement.stockName}</td>
+                          <td className="px-3 py-2">
+                            {movement.qty} {movement.unit}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
         )}
         {tab === 8 && (
           <SupplierPanel

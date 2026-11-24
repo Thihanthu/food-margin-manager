@@ -23,6 +23,9 @@ export function SalesPanel({
   const voiceCursor = useRef<{ start: number; end: number } | null>(null);
   const customerInput = useRef<HTMLInputElement | null>(null);
   const pendingCaret = useRef<number | null>(null);
+  const sortedRows = [...rows].sort((a, b) =>
+    `${b["date"]} ${b["time"] ?? ""}`.localeCompare(`${a["date"]} ${a["time"] ?? ""}`),
+  );
   const draftCustomer = draft?.["customer"];
   useEffect(() => {
     if (pendingCaret.current === null || !customerInput.current) return;
@@ -195,7 +198,7 @@ export function SalesPanel({
         </p>
       )}
       <div className="divide-y border-y">
-        {rows.map((row) => (
+        {sortedRows.map((row) => (
           <article key={row.id} className="space-y-3 py-4">
             <div className="flex justify-between gap-3">
               <div className="min-w-0">

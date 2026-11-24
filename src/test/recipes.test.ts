@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { recipeCost, reconcileSales, saleProfit, saleTotal, saveSales } from "@/lib/recipes";
+import {
+  recipeCost,
+  reconcileSales,
+  saleProfit,
+  saleTotal,
+  saveSales,
+  stockWithdrawals,
+} from "@/lib/recipes";
 import { parseBackup, staffProjection, TABLE_KEYS } from "@/lib/offline-access";
 import type { Row } from "@/lib/store";
 
@@ -39,6 +46,34 @@ describe("Per-serving recipes", () => {
   it("deducts each ingredient per serving sold", () => {
     const r = reconcileSales([], [sale], products, stock);
     expect(r.stock.map((s) => s["qty"])).toEqual([9.5, 4]);
+  });
+  it("shows recipe ingredient withdrawals with the sale's local date and time", () => {
+    const r = reconcileSales([], [{ ...sale, date: "2026-11-24", time: "10:13" }], products, stock);
+    expect(stockWithdrawals(r.sales, stock)).toEqual([
+      {
+        id: "sale:rice",
+        date: "2026-11-24",
+        time: "10:13",
+        customer: "Customer",
+        product: "Meal",
+        stockName: "Rice",
+        unit: "kg",
+        qty: 0.5,
+      },
+      {
+        id: "sale:oil",
+        date: "2026-11-24",
+        time: "10:13",
+        customer: "Customer",
+        product: "Meal",
+        stockName: "Oil",
+        unit: "litre",
+        qty: 1,
+      },
+    ]);
+  });
+  it("does not invent withdrawals for legacy sales without a usage snapshot", () => {
+    expect(stockWithdrawals([sale], stock)).toEqual([]);
   });
   it("uses the calculated cost rather than the manually entered cost for profit", () => {
     const r = reconcileSales([], [sale], products, stock);
